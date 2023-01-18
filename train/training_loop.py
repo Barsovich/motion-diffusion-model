@@ -133,7 +133,6 @@ class TrainLoop:
         for epoch in range(self.num_epochs):
             print(f'Starting epoch {epoch}')
             for motion, cond in tqdm(self.data):
-                pdb.set_trace()
                 if not (not self.lr_anneal_steps or self.step + self.resume_step < self.lr_anneal_steps):
                     break
 
