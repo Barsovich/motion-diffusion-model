@@ -12,7 +12,6 @@ from os.path import join as pjoin
 from data_loaders.humanml.data.dataset import collate_fn
 import codecs as cs
 
-
 class Logger(object):
   def __init__(self, log_dir):
     self.writer = tf.summary.create_file_writer(log_dir)

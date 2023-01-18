@@ -19,8 +19,6 @@ class TrinityDataset(Dataset):
 
         super().__init__()
 
-        # import pdb
-        # pdb.set_trace()
         self.split = split
         self.num_frames = num_frames
         self.motion_dir = motion_dir
@@ -59,8 +57,6 @@ class TrinityDataset(Dataset):
         return self.num_clips
 
     def __getitem__(self, index):
-        # import pdb
-        # pdb.set_trace()
         motion_index = bisect.bisect_left(self.motion_start_indices, index) - 1
         index_within_motion = index
         if motion_index > 0:
@@ -81,8 +77,6 @@ class TrinityDataset(Dataset):
 
 
 def trinity_collate(batch):
-    import pdb
-    pdb.set_trace()
     sample_motion = batch[0]["motion"]
     clip_frame_count = sample_motion.shape[0]
     motion_feature_count = sample_motion.shape[1]

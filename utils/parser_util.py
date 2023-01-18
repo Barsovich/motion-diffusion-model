@@ -26,12 +26,13 @@ def parse_and_load_from_model(parser):
         if a in model_args.keys():
             setattr(args, a, model_args[a])
 
-        elif 'cond_mode' in model_args: # backward compitability
+        elif 'cond_mode' in model_args:  # backward compitability
             unconstrained = (model_args['cond_mode'] == 'no_cond')
             setattr(args, 'unconstrained', unconstrained)
 
         else:
-            print('Warning: was not able to load [{}], using default value [{}] instead.'.format(a, args.__dict__[a]))
+            print('Warning: was not able to load [{}], using default value [{}] instead.'.format(
+                a, args.__dict__[a]))
 
     if args.cond_mask_prob == 0:
         args.guidance_param = 1
@@ -41,9 +42,11 @@ def parse_and_load_from_model(parser):
 def get_args_per_group_name(parser, args, group_name):
     for group in parser._action_groups:
         if group.title == group_name:
-            group_dict = {a.dest: getattr(args, a.dest, None) for a in group._group_actions}
+            group_dict = {a.dest: getattr(args, a.dest, None)
+                          for a in group._group_actions}
             return list(argparse.Namespace(**group_dict).__dict__.keys())
     return ValueError('group_name was not found.')
+
 
 def get_model_path_from_args():
     try:
@@ -57,10 +60,16 @@ def get_model_path_from_args():
 
 def add_base_options(parser):
     group = parser.add_argument_group('base')
-    group.add_argument("--cuda", default=True, type=bool, help="Use cuda device, otherwise use CPU.")
-    group.add_argument("--device", default=0, type=int, help="Device id to use.")
-    group.add_argument("--seed", default=10, type=int, help="For fixing random seed.")
-    group.add_argument("--batch_size", default=64, type=int, help="Batch size during training.")
+    group.add_argument("--cuda", default=True, type=bool,
+                       help="Use cuda device, otherwise use CPU.")
+    group.add_argument("--device", default=0, type=int,
+                       help="Device id to use.")
+    group.add_argument("--seed", default=10, type=int,
+                       help="For fixing random seed.")
+    group.add_argument("--batch_size", default=64, type=int,
+                       help="Batch size during training.")
+    group.add_argument("--num_data_loader_threads", default=4, type=int,
+                       help="Data loader thread count.")
 
 
 def add_diffusion_options(parser):
@@ -69,7 +78,8 @@ def add_diffusion_options(parser):
                        help="Noise schedule type")
     group.add_argument("--diffusion_steps", default=1000, type=int,
                        help="Number of diffusion steps (denoted T in the paper)")
-    group.add_argument("--sigma_small", default=True, type=bool, help="Use smaller sigma values.")
+    group.add_argument("--sigma_small", default=True,
+                       type=bool, help="Use smaller sigma values.")
 
 
 def add_model_options(parser):
@@ -87,18 +97,20 @@ def add_model_options(parser):
     group.add_argument("--cond_mask_prob", default=.1, type=float,
                        help="The probability of masking the condition during training."
                             " For classifier-free guidance learning.")
-    group.add_argument("--lambda_rcxyz", default=0.0, type=float, help="Joint positions loss.")
-    group.add_argument("--lambda_vel", default=0.0, type=float, help="Joint velocity loss.")
-    group.add_argument("--lambda_fc", default=0.0, type=float, help="Foot contact loss.")
+    group.add_argument("--lambda_rcxyz", default=0.0,
+                       type=float, help="Joint positions loss.")
+    group.add_argument("--lambda_vel", default=0.0,
+                       type=float, help="Joint velocity loss.")
+    group.add_argument("--lambda_fc", default=0.0,
+                       type=float, help="Foot contact loss.")
     group.add_argument("--unconstrained", action='store_true',
                        help="Model is trained unconditionally. That is, it is constrained by neither text nor action. "
                             "Currently tested on HumanAct12 only.")
 
 
-
 def add_data_options(parser):
     group = parser.add_argument_group('dataset')
-    group.add_argument("--dataset", default='humanml', choices=['humanml', 'kit', 'humanact12', 'uestc'], type=str,
+    group.add_argument("--dataset", default='humanml', choices=['humanml', 'kit', 'humanact12', 'uestc', 'trinity'], type=str,
                        help="Dataset name (choose from list).")
     group.add_argument("--data_dir", default="", type=str,
                        help="If empty, will use defaults according to the specified dataset.")
@@ -113,8 +125,10 @@ def add_training_options(parser):
     group.add_argument("--train_platform_type", default='NoPlatform', choices=['NoPlatform', 'ClearmlPlatform', 'TensorboardPlatform'], type=str,
                        help="Choose platform to log results. NoPlatform means no logging.")
     group.add_argument("--lr", default=1e-4, type=float, help="Learning rate.")
-    group.add_argument("--weight_decay", default=0.0, type=float, help="Optimizer weight decay.")
-    group.add_argument("--lr_anneal_steps", default=0, type=int, help="Number of learning rate anneal steps.")
+    group.add_argument("--weight_decay", default=0.0,
+                       type=float, help="Optimizer weight decay.")
+    group.add_argument("--lr_anneal_steps", default=0, type=int,
+                       help="Number of learning rate anneal steps.")
     group.add_argument("--eval_batch_size", default=32, type=int,
                        help="Batch size during evaluation loop. Do not change this unless you know what you are doing. "
                             "T2m precision calculation is based on fixed batch size 32.")

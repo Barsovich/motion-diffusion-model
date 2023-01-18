@@ -48,7 +48,7 @@ class TrainLoop:
 
         self.step = 0
         self.resume_step = 0
-        self.global_batch = self.batch_size # * dist.get_world_size()
+        self.global_batch = self.batch_size  # * dist.get_world_size()
         self.num_steps = args.num_steps
         self.num_epochs = self.num_steps // len(self.data) + 1
 
@@ -77,7 +77,8 @@ class TrainLoop:
             self.device = torch.device(dist_util.dev())
 
         self.schedule_sampler_type = 'uniform'
-        self.schedule_sampler = create_named_schedule_sampler(self.schedule_sampler_type, diffusion)
+        self.schedule_sampler = create_named_schedule_sampler(
+            self.schedule_sampler_type, diffusion)
         self.eval_wrapper, self.eval_data, self.eval_gt_data = None, None, None
         if args.dataset in ['kit', 'humanml'] and args.eval_during_training:
             mm_num_samples = 0  # mm is super slow hence we won't run it during training
@@ -89,7 +90,8 @@ class TrainLoop:
             self.eval_gt_data = get_dataset_loader(name=args.dataset, batch_size=args.eval_batch_size, num_frames=None,
                                                    split=args.eval_split,
                                                    hml_mode='gt')
-            self.eval_wrapper = EvaluatorMDMWrapper(args.dataset, dist_util.dev())
+            self.eval_wrapper = EvaluatorMDMWrapper(
+                args.dataset, dist_util.dev())
             self.eval_data = {
                 'test': lambda: eval_humanml.get_mdm_loader(
                     model, diffusion, args.eval_batch_size,
@@ -104,8 +106,10 @@ class TrainLoop:
         resume_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
 
         if resume_checkpoint:
-            self.resume_step = parse_resume_step_from_filename(resume_checkpoint)
-            logger.log(f"loading model from checkpoint: {resume_checkpoint}...")
+            self.resume_step = parse_resume_step_from_filename(
+                resume_checkpoint)
+            logger.log(
+                f"loading model from checkpoint: {resume_checkpoint}...")
             self.model.load_state_dict(
                 dist_util.load_state_dict(
                     resume_checkpoint, map_location=dist_util.dev()
@@ -118,33 +122,37 @@ class TrainLoop:
             bf.dirname(main_checkpoint), f"opt{self.resume_step:09}.pt"
         )
         if bf.exists(opt_checkpoint):
-            logger.log(f"loading optimizer state from checkpoint: {opt_checkpoint}")
+            logger.log(
+                f"loading optimizer state from checkpoint: {opt_checkpoint}")
             state_dict = dist_util.load_state_dict(
                 opt_checkpoint, map_location=dist_util.dev()
             )
             self.opt.load_state_dict(state_dict)
 
     def run_loop(self):
-
         for epoch in range(self.num_epochs):
             print(f'Starting epoch {epoch}')
             for motion, cond in tqdm(self.data):
+                pdb.set_trace()
                 if not (not self.lr_anneal_steps or self.step + self.resume_step < self.lr_anneal_steps):
                     break
 
                 motion = motion.to(self.device)
-                cond['y'] = {key: val.to(self.device) if torch.is_tensor(val) else val for key, val in cond['y'].items()}
+                cond['y'] = {key: val.to(self.device) if torch.is_tensor(
+                    val) else val for key, val in cond['y'].items()}
 
                 self.run_step(motion, cond)
                 if self.step % self.log_interval == 0:
-                    for k,v in logger.get_current().name2val.items():
+                    for k, v in logger.get_current().name2val.items():
                         if k == 'loss':
-                            print('step[{}]: loss[{:0.5f}]'.format(self.step+self.resume_step, v))
+                            print('step[{}]: loss[{:0.5f}]'.format(
+                                self.step+self.resume_step, v))
 
                         if k in ['step', 'samples'] or '_q' in k:
                             continue
                         else:
-                            self.train_platform.report_scalar(name=k, value=v, iteration=self.step, group_name='Loss')
+                            self.train_platform.report_scalar(
+                                name=k, value=v, iteration=self.step, group_name='Loss')
 
                 if self.step % self.save_interval == 0:
                     self.save()
@@ -169,7 +177,8 @@ class TrainLoop:
         start_eval = time.time()
         if self.eval_wrapper is not None:
             print('Running evaluation loop: [Should take about 90 min]')
-            log_file = os.path.join(self.save_dir, f'eval_humanml_{(self.step + self.resume_step):09d}.log')
+            log_file = os.path.join(
+                self.save_dir, f'eval_humanml_{(self.step + self.resume_step):09d}.log')
             diversity_times = 300
             mm_num_times = 0  # mm is super slow hence we won't run it during training
             eval_dict = eval_humanml.evaluation(
@@ -188,20 +197,23 @@ class TrainLoop:
 
         elif self.dataset in ['humanact12', 'uestc']:
             eval_args = SimpleNamespace(num_seeds=self.args.eval_rep_times, num_samples=self.args.eval_num_samples,
-                                        batch_size=self.args.eval_batch_size, device=self.device, guidance_param = 1,
+                                        batch_size=self.args.eval_batch_size, device=self.device, guidance_param=1,
                                         dataset=self.dataset, unconstrained=self.args.unconstrained,
                                         model_path=os.path.join(self.save_dir, self.ckpt_file_name()))
-            eval_dict = eval_humanact12_uestc.evaluate(eval_args, model=self.model, diffusion=self.diffusion, data=self.data.dataset)
-            print(f'Evaluation results on {self.dataset}: {sorted(eval_dict["feats"].items())}')
+            eval_dict = eval_humanact12_uestc.evaluate(
+                eval_args, model=self.model, diffusion=self.diffusion, data=self.data.dataset)
+            print(
+                f'Evaluation results on {self.dataset}: {sorted(eval_dict["feats"].items())}')
             for k, v in eval_dict["feats"].items():
                 if 'unconstrained' not in k:
-                    self.train_platform.report_scalar(name=k, value=np.array(v).astype(float).mean(), iteration=self.step, group_name='Eval')
+                    self.train_platform.report_scalar(name=k, value=np.array(v).astype(
+                        float).mean(), iteration=self.step, group_name='Eval')
                 else:
-                    self.train_platform.report_scalar(name=k, value=np.array(v).astype(float).mean(), iteration=self.step, group_name='Eval Unconstrained')
+                    self.train_platform.report_scalar(name=k, value=np.array(v).astype(
+                        float).mean(), iteration=self.step, group_name='Eval Unconstrained')
 
         end_eval = time.time()
         print(f'Evaluation time: {round(end_eval-start_eval)/60}min')
-
 
     def run_step(self, batch, cond):
         self.forward_backward(batch, cond)
@@ -218,7 +230,8 @@ class TrainLoop:
             micro = batch
             micro_cond = cond
             last_batch = (i + self.microbatch) >= batch.shape[0]
-            t, weights = self.schedule_sampler.sample(micro.shape[0], dist_util.dev())
+            t, weights = self.schedule_sampler.sample(
+                micro.shape[0], dist_util.dev())
 
             compute_losses = functools.partial(
                 self.diffusion.training_losses,
@@ -256,19 +269,19 @@ class TrainLoop:
 
     def log_step(self):
         logger.logkv("step", self.step + self.resume_step)
-        logger.logkv("samples", (self.step + self.resume_step + 1) * self.global_batch)
-
+        logger.logkv("samples", (self.step + self.resume_step + 1)
+                     * self.global_batch)
 
     def ckpt_file_name(self):
         return f"model{(self.step+self.resume_step):09d}.pt"
-
 
     def save(self):
         def save_checkpoint(params):
             state_dict = self.mp_trainer.master_params_to_state_dict(params)
 
             # Do not save CLIP weights
-            clip_weights = [e for e in state_dict.keys() if e.startswith('clip_model.')]
+            clip_weights = [
+                e for e in state_dict.keys() if e.startswith('clip_model.')]
             for e in clip_weights:
                 del state_dict[e]
 
@@ -280,7 +293,8 @@ class TrainLoop:
         save_checkpoint(self.mp_trainer.master_params)
 
         with bf.BlobFile(
-            bf.join(self.save_dir, f"opt{(self.step+self.resume_step):09d}.pt"),
+            bf.join(self.save_dir,
+                    f"opt{(self.step+self.resume_step):09d}.pt"),
             "wb",
         ) as f:
             torch.save(self.opt.state_dict(), f)

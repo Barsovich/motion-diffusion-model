@@ -14,19 +14,22 @@ from data_loaders.humanml.utils.get_opt import get_opt
 
 # import spacy
 
+
 def collate_fn(batch):
     batch.sort(key=lambda x: x[3], reverse=True)
     return default_collate(batch)
 
 
 '''For use of training text-2-motion generative model'''
+
+
 class Text2MotionDataset(data.Dataset):
     def __init__(self, opt, mean, std, split_file, w_vectorizer):
         self.opt = opt
         self.w_vectorizer = w_vectorizer
         self.max_length = 20
         self.pointer = 0
-        min_motion_len = 40 if self.opt.dataset_name =='t2m' else 24
+        min_motion_len = 40 if self.opt.dataset_name == 't2m' else 24
 
         joints_num = opt.joints_num
 
@@ -63,34 +66,38 @@ class Text2MotionDataset(data.Dataset):
                             text_data.append(text_dict)
                         else:
                             try:
-                                n_motion = motion[int(f_tag*20) : int(to_tag*20)]
+                                n_motion = motion[int(
+                                    f_tag*20): int(to_tag*20)]
                                 if (len(n_motion)) < min_motion_len or (len(n_motion) >= 200):
                                     continue
-                                new_name = random.choice('ABCDEFGHIJKLMNOPQRSTUVW') + '_' + name
+                                new_name = random.choice(
+                                    'ABCDEFGHIJKLMNOPQRSTUVW') + '_' + name
                                 while new_name in data_dict:
-                                    new_name = random.choice('ABCDEFGHIJKLMNOPQRSTUVW') + '_' + name
+                                    new_name = random.choice(
+                                        'ABCDEFGHIJKLMNOPQRSTUVW') + '_' + name
                                 data_dict[new_name] = {'motion': n_motion,
                                                        'length': len(n_motion),
-                                                       'text':[text_dict]}
+                                                       'text': [text_dict]}
                                 new_name_list.append(new_name)
                                 length_list.append(len(n_motion))
                             except:
                                 print(line_split)
-                                print(line_split[2], line_split[3], f_tag, to_tag, name)
+                                print(
+                                    line_split[2], line_split[3], f_tag, to_tag, name)
                                 # break
 
                 if flag:
                     data_dict[name] = {'motion': motion,
                                        'length': len(motion),
-                                       'text':text_data}
+                                       'text': text_data}
                     new_name_list.append(name)
                     length_list.append(len(motion))
             except:
                 # Some motion may not exist in KIT dataset
                 pass
 
-
-        name_list, length_list = zip(*sorted(zip(new_name_list, length_list), key=lambda x: x[1]))
+        name_list, length_list = zip(
+            *sorted(zip(new_name_list, length_list), key=lambda x: x[1]))
 
         if opt.is_train:
             # root_rot_velocity (B, seq_len, 1)
@@ -100,19 +107,21 @@ class Text2MotionDataset(data.Dataset):
             # root_y (B, seq_len, 1)
             std[3:4] = std[3:4] / opt.feat_bias
             # ric_data (B, seq_len, (joint_num - 1)*3)
-            std[4: 4 + (joints_num - 1) * 3] = std[4: 4 + (joints_num - 1) * 3] / 1.0
+            std[4: 4 + (joints_num - 1) * 3] = std[4: 4 +
+                                                   (joints_num - 1) * 3] / 1.0
             # rot_data (B, seq_len, (joint_num - 1)*6)
             std[4 + (joints_num - 1) * 3: 4 + (joints_num - 1) * 9] = std[4 + (joints_num - 1) * 3: 4 + (
-                        joints_num - 1) * 9] / 1.0
+                joints_num - 1) * 9] / 1.0
             # local_velocity (B, seq_len, joint_num*3)
             std[4 + (joints_num - 1) * 9: 4 + (joints_num - 1) * 9 + joints_num * 3] = std[
-                                                                                       4 + (joints_num - 1) * 9: 4 + (
-                                                                                                   joints_num - 1) * 9 + joints_num * 3] / 1.0
+                4 + (joints_num - 1) * 9: 4 + (
+                    joints_num - 1) * 9 + joints_num * 3] / 1.0
             # foot contact (B, seq_len, 4)
             std[4 + (joints_num - 1) * 9 + joints_num * 3:] = std[
-                                                              4 + (joints_num - 1) * 9 + joints_num * 3:] / opt.feat_bias
+                4 + (joints_num - 1) * 9 + joints_num * 3:] / opt.feat_bias
 
-            assert 4 + (joints_num - 1) * 9 + joints_num * 3 + 4 == mean.shape[-1]
+            assert 4 + (joints_num - 1) * 9 + \
+                joints_num * 3 + 4 == mean.shape[-1]
             np.save(pjoin(opt.meta_dir, 'mean.npy'), mean)
             np.save(pjoin(opt.meta_dir, 'std.npy'), std)
 
@@ -126,7 +135,7 @@ class Text2MotionDataset(data.Dataset):
     def reset_max_len(self, length):
         assert length <= self.opt.max_motion_length
         self.pointer = np.searchsorted(self.length_arr, length)
-        print("Pointer Pointing at %d"%self.pointer)
+        print("Pointer Pointing at %d" % self.pointer)
         self.max_length = length
 
     def inv_transform(self, data):
@@ -147,7 +156,8 @@ class Text2MotionDataset(data.Dataset):
             # pad with "unk"
             tokens = ['sos/OTHER'] + tokens + ['eos/OTHER']
             sent_len = len(tokens)
-            tokens = tokens + ['unk/OTHER'] * (self.opt.max_text_len + 2 - sent_len)
+            tokens = tokens + ['unk/OTHER'] * \
+                (self.opt.max_text_len + 2 - sent_len)
         else:
             # crop
             tokens = tokens[:self.opt.max_text_len]
@@ -166,7 +176,7 @@ class Text2MotionDataset(data.Dataset):
 
         if self.opt.is_train:
             if m_length != self.max_length:
-            # print("Motion original length:%d_%d"%(m_length, len(motion)))
+                # print("Motion original length:%d_%d"%(m_length, len(motion)))
                 if self.opt.unit_length < 10:
                     coin2 = np.random.choice(['single', 'single', 'double'])
                 else:
@@ -179,7 +189,8 @@ class Text2MotionDataset(data.Dataset):
                     if coin2 == 'single':
                         n_m_length = self.max_length + self.opt.unit_length * len_gap
                     else:
-                        n_m_length = self.max_length + self.opt.unit_length * (len_gap - 1)
+                        n_m_length = self.max_length + \
+                            self.opt.unit_length * (len_gap - 1)
                     idx = random.randint(0, m_length - n_m_length)
                     motion = motion[idx:idx + self.max_length]
                     m_length = n_m_length
@@ -191,9 +202,11 @@ class Text2MotionDataset(data.Dataset):
                 coin2 = 'single'
 
             if coin2 == 'double':
-                m_length = (m_length // self.opt.unit_length - 1) * self.opt.unit_length
+                m_length = (m_length // self.opt.unit_length - 1) * \
+                    self.opt.unit_length
             elif coin2 == 'single':
-                m_length = (m_length // self.opt.unit_length) * self.opt.unit_length
+                m_length = (m_length // self.opt.unit_length) * \
+                    self.opt.unit_length
             idx = random.randint(0, len(motion) - m_length)
             motion = motion[idx:idx+m_length]
 
@@ -204,6 +217,8 @@ class Text2MotionDataset(data.Dataset):
 
 
 '''For use of training text motion matching model, and evaluations'''
+
+
 class Text2MotionDatasetV2(data.Dataset):
     def __init__(self, opt, mean, std, split_file, w_vectorizer):
         self.opt = opt
@@ -211,7 +226,7 @@ class Text2MotionDatasetV2(data.Dataset):
         self.max_length = 20
         self.pointer = 0
         self.max_motion_length = opt.max_motion_length
-        min_motion_len = 40 if self.opt.dataset_name =='t2m' else 24
+        min_motion_len = 40 if self.opt.dataset_name == 't2m' else 24
 
         data_dict = {}
         id_list = []
@@ -247,20 +262,24 @@ class Text2MotionDatasetV2(data.Dataset):
                             text_data.append(text_dict)
                         else:
                             try:
-                                n_motion = motion[int(f_tag*20) : int(to_tag*20)]
+                                n_motion = motion[int(
+                                    f_tag*20): int(to_tag*20)]
                                 if (len(n_motion)) < min_motion_len or (len(n_motion) >= 200):
                                     continue
-                                new_name = random.choice('ABCDEFGHIJKLMNOPQRSTUVW') + '_' + name
+                                new_name = random.choice(
+                                    'ABCDEFGHIJKLMNOPQRSTUVW') + '_' + name
                                 while new_name in data_dict:
-                                    new_name = random.choice('ABCDEFGHIJKLMNOPQRSTUVW') + '_' + name
+                                    new_name = random.choice(
+                                        'ABCDEFGHIJKLMNOPQRSTUVW') + '_' + name
                                 data_dict[new_name] = {'motion': n_motion,
                                                        'length': len(n_motion),
-                                                       'text':[text_dict]}
+                                                       'text': [text_dict]}
                                 new_name_list.append(new_name)
                                 length_list.append(len(n_motion))
                             except:
                                 print(line_split)
-                                print(line_split[2], line_split[3], f_tag, to_tag, name)
+                                print(
+                                    line_split[2], line_split[3], f_tag, to_tag, name)
                                 # break
 
                 if flag:
@@ -272,7 +291,8 @@ class Text2MotionDatasetV2(data.Dataset):
             except:
                 pass
 
-        name_list, length_list = zip(*sorted(zip(new_name_list, length_list), key=lambda x: x[1]))
+        name_list, length_list = zip(
+            *sorted(zip(new_name_list, length_list), key=lambda x: x[1]))
 
         self.mean = mean
         self.std = std
@@ -284,7 +304,7 @@ class Text2MotionDatasetV2(data.Dataset):
     def reset_max_len(self, length):
         assert length <= self.max_motion_length
         self.pointer = np.searchsorted(self.length_arr, length)
-        print("Pointer Pointing at %d"%self.pointer)
+        print("Pointer Pointing at %d" % self.pointer)
         self.max_length = length
 
     def inv_transform(self, data):
@@ -305,7 +325,8 @@ class Text2MotionDatasetV2(data.Dataset):
             # pad with "unk"
             tokens = ['sos/OTHER'] + tokens + ['eos/OTHER']
             sent_len = len(tokens)
-            tokens = tokens + ['unk/OTHER'] * (self.opt.max_text_len + 2 - sent_len)
+            tokens = tokens + ['unk/OTHER'] * \
+                (self.opt.max_text_len + 2 - sent_len)
         else:
             # crop
             tokens = tokens[:self.opt.max_text_len]
@@ -327,9 +348,11 @@ class Text2MotionDatasetV2(data.Dataset):
             coin2 = 'single'
 
         if coin2 == 'double':
-            m_length = (m_length // self.opt.unit_length - 1) * self.opt.unit_length
+            m_length = (m_length // self.opt.unit_length - 1) * \
+                self.opt.unit_length
         elif coin2 == 'single':
-            m_length = (m_length // self.opt.unit_length) * self.opt.unit_length
+            m_length = (m_length // self.opt.unit_length) * \
+                self.opt.unit_length
         idx = random.randint(0, len(motion) - m_length)
         motion = motion[idx:idx+m_length]
 
@@ -338,7 +361,8 @@ class Text2MotionDatasetV2(data.Dataset):
 
         if m_length < self.max_motion_length:
             motion = np.concatenate([motion,
-                                     np.zeros((self.max_motion_length - m_length, motion.shape[1]))
+                                     np.zeros(
+                                         (self.max_motion_length - m_length, motion.shape[1]))
                                      ], axis=0)
         # print(word_embeddings.shape, motion.shape)
         # print(tokens)
@@ -346,6 +370,8 @@ class Text2MotionDatasetV2(data.Dataset):
 
 
 '''For use of training baseline'''
+
+
 class Text2MotionDatasetBaseline(data.Dataset):
     def __init__(self, opt, mean, std, split_file, w_vectorizer):
         self.opt = opt
@@ -353,7 +379,7 @@ class Text2MotionDatasetBaseline(data.Dataset):
         self.max_length = 20
         self.pointer = 0
         self.max_motion_length = opt.max_motion_length
-        min_motion_len = 40 if self.opt.dataset_name =='t2m' else 24
+        min_motion_len = 40 if self.opt.dataset_name == 't2m' else 24
 
         data_dict = {}
         id_list = []
@@ -389,20 +415,24 @@ class Text2MotionDatasetBaseline(data.Dataset):
                             text_data.append(text_dict)
                         else:
                             try:
-                                n_motion = motion[int(f_tag*20) : int(to_tag*20)]
+                                n_motion = motion[int(
+                                    f_tag*20): int(to_tag*20)]
                                 if (len(n_motion)) < min_motion_len or (len(n_motion) >= 200):
                                     continue
-                                new_name = random.choice('ABCDEFGHIJKLMNOPQRSTUVW') + '_' + name
+                                new_name = random.choice(
+                                    'ABCDEFGHIJKLMNOPQRSTUVW') + '_' + name
                                 while new_name in data_dict:
-                                    new_name = random.choice('ABCDEFGHIJKLMNOPQRSTUVW') + '_' + name
+                                    new_name = random.choice(
+                                        'ABCDEFGHIJKLMNOPQRSTUVW') + '_' + name
                                 data_dict[new_name] = {'motion': n_motion,
                                                        'length': len(n_motion),
-                                                       'text':[text_dict]}
+                                                       'text': [text_dict]}
                                 new_name_list.append(new_name)
                                 length_list.append(len(n_motion))
                             except:
                                 print(line_split)
-                                print(line_split[2], line_split[3], f_tag, to_tag, name)
+                                print(
+                                    line_split[2], line_split[3], f_tag, to_tag, name)
                                 # break
 
                 if flag:
@@ -414,7 +444,8 @@ class Text2MotionDatasetBaseline(data.Dataset):
             except:
                 pass
 
-        name_list, length_list = zip(*sorted(zip(new_name_list, length_list), key=lambda x: x[1]))
+        name_list, length_list = zip(
+            *sorted(zip(new_name_list, length_list), key=lambda x: x[1]))
 
         self.mean = mean
         self.std = std
@@ -426,7 +457,7 @@ class Text2MotionDatasetBaseline(data.Dataset):
     def reset_max_len(self, length):
         assert length <= self.max_motion_length
         self.pointer = np.searchsorted(self.length_arr, length)
-        print("Pointer Pointing at %d"%self.pointer)
+        print("Pointer Pointing at %d" % self.pointer)
         self.max_length = length
 
     def inv_transform(self, data):
@@ -447,7 +478,8 @@ class Text2MotionDatasetBaseline(data.Dataset):
             # pad with "unk"
             tokens = ['sos/OTHER'] + tokens + ['eos/OTHER']
             sent_len = len(tokens)
-            tokens = tokens + ['unk/OTHER'] * (self.opt.max_text_len + 2 - sent_len)
+            tokens = tokens + ['unk/OTHER'] * \
+                (self.opt.max_text_len + 2 - sent_len)
         else:
             # crop
             tokens = tokens[:self.opt.max_text_len]
@@ -477,7 +509,8 @@ class Text2MotionDatasetBaseline(data.Dataset):
                 if coin2 == 'single':
                     n_m_length = self.max_length + self.opt.unit_length * len_gap
                 else:
-                    n_m_length = self.max_length + self.opt.unit_length * (len_gap - 1)
+                    n_m_length = self.max_length + \
+                        self.opt.unit_length * (len_gap - 1)
                 s_idx = random.randint(0, m_length - n_m_length)
                 m_length = n_m_length
         else:
@@ -492,8 +525,9 @@ class Text2MotionDatasetBaseline(data.Dataset):
 
         if m_length < self.max_motion_length:
             src_motion = np.concatenate([src_motion,
-                                     np.zeros((self.max_motion_length - m_length, motion.shape[1]))
-                                     ], axis=0)
+                                         np.zeros(
+                                             (self.max_motion_length - m_length, motion.shape[1]))
+                                         ], axis=0)
         # print(m_length, src_motion.shape, tgt_motion.shape)
         # print(word_embeddings.shape, motion.shape)
         # print(tokens)
@@ -533,25 +567,28 @@ class MotionDatasetV2(data.Dataset):
             # root_y (B, seq_len, 1)
             std[3:4] = std[3:4] / opt.feat_bias
             # ric_data (B, seq_len, (joint_num - 1)*3)
-            std[4: 4 + (joints_num - 1) * 3] = std[4: 4 + (joints_num - 1) * 3] / 1.0
+            std[4: 4 + (joints_num - 1) * 3] = std[4: 4 +
+                                                   (joints_num - 1) * 3] / 1.0
             # rot_data (B, seq_len, (joint_num - 1)*6)
             std[4 + (joints_num - 1) * 3: 4 + (joints_num - 1) * 9] = std[4 + (joints_num - 1) * 3: 4 + (
-                        joints_num - 1) * 9] / 1.0
+                joints_num - 1) * 9] / 1.0
             # local_velocity (B, seq_len, joint_num*3)
             std[4 + (joints_num - 1) * 9: 4 + (joints_num - 1) * 9 + joints_num * 3] = std[
-                                                                                       4 + (joints_num - 1) * 9: 4 + (
-                                                                                                   joints_num - 1) * 9 + joints_num * 3] / 1.0
+                4 + (joints_num - 1) * 9: 4 + (
+                    joints_num - 1) * 9 + joints_num * 3] / 1.0
             # foot contact (B, seq_len, 4)
             std[4 + (joints_num - 1) * 9 + joints_num * 3:] = std[
-                                                              4 + (joints_num - 1) * 9 + joints_num * 3:] / opt.feat_bias
+                4 + (joints_num - 1) * 9 + joints_num * 3:] / opt.feat_bias
 
-            assert 4 + (joints_num - 1) * 9 + joints_num * 3 + 4 == mean.shape[-1]
+            assert 4 + (joints_num - 1) * 9 + \
+                joints_num * 3 + 4 == mean.shape[-1]
             np.save(pjoin(opt.meta_dir, 'mean.npy'), mean)
             np.save(pjoin(opt.meta_dir, 'std.npy'), std)
 
         self.mean = mean
         self.std = std
-        print("Total number of motions {}, snippets {}".format(len(self.data), self.cumsum[-1]))
+        print("Total number of motions {}, snippets {}".format(
+            len(self.data), self.cumsum[-1]))
 
     def inv_transform(self, data):
         return data * self.std + self.mean
@@ -584,12 +621,13 @@ class RawTextDataset(data.Dataset):
         with cs.open(text_file) as f:
             for line in f.readlines():
                 word_list, pos_list = self.process_text(line.strip())
-                tokens = ['%s/%s'%(word_list[i], pos_list[i]) for i in range(len(word_list))]
-                self.data_dict.append({'caption':line.strip(), "tokens":tokens})
+                tokens = ['%s/%s' % (word_list[i], pos_list[i])
+                          for i in range(len(word_list))]
+                self.data_dict.append(
+                    {'caption': line.strip(), "tokens": tokens})
 
         self.w_vectorizer = w_vectorizer
         print("Total number of descriptions {}".format(len(self.data_dict)))
-
 
     def process_text(self, sentence):
         sentence = sentence.replace('-', '')
@@ -621,7 +659,8 @@ class RawTextDataset(data.Dataset):
             # pad with "unk"
             tokens = ['sos/OTHER'] + tokens + ['eos/OTHER']
             sent_len = len(tokens)
-            tokens = tokens + ['unk/OTHER'] * (self.opt.max_text_len + 2 - sent_len)
+            tokens = tokens + ['unk/OTHER'] * \
+                (self.opt.max_text_len + 2 - sent_len)
         else:
             # crop
             tokens = tokens[:self.opt.max_text_len]
@@ -638,6 +677,7 @@ class RawTextDataset(data.Dataset):
 
         return word_embeddings, pos_one_hots, caption, sent_len
 
+
 class TextOnlyDataset(data.Dataset):
     def __init__(self, opt, mean, std, split_file):
         self.mean = mean
@@ -647,7 +687,6 @@ class TextOnlyDataset(data.Dataset):
         self.max_length = 20
         self.pointer = 0
         self.fixed_length = 120
-
 
         data_dict = {}
         id_list = []
@@ -680,14 +719,17 @@ class TextOnlyDataset(data.Dataset):
                             text_data.append(text_dict)
                         else:
                             try:
-                                new_name = random.choice('ABCDEFGHIJKLMNOPQRSTUVW') + '_' + name
+                                new_name = random.choice(
+                                    'ABCDEFGHIJKLMNOPQRSTUVW') + '_' + name
                                 while new_name in data_dict:
-                                    new_name = random.choice('ABCDEFGHIJKLMNOPQRSTUVW') + '_' + name
-                                data_dict[new_name] = {'text':[text_dict]}
+                                    new_name = random.choice(
+                                        'ABCDEFGHIJKLMNOPQRSTUVW') + '_' + name
+                                data_dict[new_name] = {'text': [text_dict]}
                                 new_name_list.append(new_name)
                             except:
                                 print(line_split)
-                                print(line_split[2], line_split[3], f_tag, to_tag, name)
+                                print(
+                                    line_split[2], line_split[3], f_tag, to_tag, name)
                                 # break
 
                 if flag:
@@ -718,17 +760,20 @@ class TextOnlyDataset(data.Dataset):
         # fixed_length can be set from outside before sampling
 
 # A wrapper class for t2m original dataset for MDM purposes
+
+
 class HumanML3D(data.Dataset):
     def __init__(self, mode, datapath='./dataset/humanml_opt.txt', split="train", **kwargs):
         self.mode = mode
-        
+
         self.dataset_name = 't2m'
         self.dataname = 't2m'
 
         # Configurations of T2M dataset and KIT dataset is almost the same
         abs_base_path = f'.'
         dataset_opt_path = pjoin(abs_base_path, datapath)
-        device = None  # torch.device('cuda:4') # This param is not in use in this context
+        # torch.device('cuda:4') # This param is not in use in this context
+        device = None
         opt = get_opt(dataset_opt_path, device)
         opt.meta_dir = pjoin(abs_base_path, opt.meta_dir)
         opt.motion_dir = pjoin(abs_base_path, opt.motion_dir)
@@ -743,8 +788,10 @@ class HumanML3D(data.Dataset):
 
         if mode == 'gt':
             # used by T2M models (including evaluators)
-            self.mean = np.load(pjoin(opt.meta_dir, f'{opt.dataset_name}_mean.npy'))
-            self.std = np.load(pjoin(opt.meta_dir, f'{opt.dataset_name}_std.npy'))
+            self.mean = np.load(
+                pjoin(opt.meta_dir, f'{opt.dataset_name}_mean.npy'))
+            self.std = np.load(
+                pjoin(opt.meta_dir, f'{opt.dataset_name}_std.npy'))
         elif mode in ['train', 'eval', 'text_only']:
             # used by our models
             self.mean = np.load(pjoin(opt.data_root, 'Mean.npy'))
@@ -753,16 +800,21 @@ class HumanML3D(data.Dataset):
         if mode == 'eval':
             # used by T2M models (including evaluators)
             # this is to translate their norms to ours
-            self.mean_for_eval = np.load(pjoin(opt.meta_dir, f'{opt.dataset_name}_mean.npy'))
-            self.std_for_eval = np.load(pjoin(opt.meta_dir, f'{opt.dataset_name}_std.npy'))
+            self.mean_for_eval = np.load(
+                pjoin(opt.meta_dir, f'{opt.dataset_name}_mean.npy'))
+            self.std_for_eval = np.load(
+                pjoin(opt.meta_dir, f'{opt.dataset_name}_std.npy'))
 
         self.split_file = pjoin(opt.data_root, f'{split}.txt')
         if mode == 'text_only':
-            self.t2m_dataset = TextOnlyDataset(self.opt, self.mean, self.std, self.split_file)
+            self.t2m_dataset = TextOnlyDataset(
+                self.opt, self.mean, self.std, self.split_file)
         else:
-            self.w_vectorizer = WordVectorizer(pjoin(abs_base_path, 'glove'), 'our_vab')
-            self.t2m_dataset = Text2MotionDatasetV2(self.opt, self.mean, self.std, self.split_file, self.w_vectorizer)
-            self.num_actions = 1 # dummy placeholder
+            self.w_vectorizer = WordVectorizer(
+                pjoin(abs_base_path, 'glove'), 'our_vab')
+            self.t2m_dataset = Text2MotionDatasetV2(
+                self.opt, self.mean, self.std, self.split_file, self.w_vectorizer)
+            self.num_actions = 1  # dummy placeholder
 
         assert len(self.t2m_dataset) > 1, 'You loaded an empty dataset, ' \
                                           'it is probably because your data dir has only texts and no motions.\n' \
@@ -776,6 +828,8 @@ class HumanML3D(data.Dataset):
         return self.t2m_dataset.__len__()
 
 # A wrapper class for t2m original dataset for MDM purposes
+
+
 class KIT(HumanML3D):
     def __init__(self, mode, datapath='./dataset/kit_opt.txt', split="train", **kwargs):
         super(KIT, self).__init__(mode, datapath, split, **kwargs)

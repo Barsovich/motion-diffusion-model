@@ -4,7 +4,8 @@ from diffusion.respace import SpacedDiffusion, space_timesteps
 
 
 def load_model_wo_clip(model, state_dict):
-    missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
+    missing_keys, unexpected_keys = model.load_state_dict(
+        state_dict, strict=False)
     assert len(unexpected_keys) == 0
     assert all([k.startswith('clip_model.') for k in missing_keys])
 
@@ -22,7 +23,7 @@ def get_model_args(args, data):
     action_emb = 'tensor'
     if args.unconstrained:
         cond_mode = 'no_cond'
-    elif args.dataset in ['kit', 'humanml']:
+    elif args.dataset in ['kit', 'humanml', 'trinity']:
         cond_mode = 'text'
     else:
         cond_mode = 'action'
@@ -55,7 +56,8 @@ def get_model_args(args, data):
 
 def create_gaussian_diffusion(args):
     # default params
-    predict_xstart = True  # we always predict x_start (a.k.a. x0), that's our deal!
+    # we always predict x_start (a.k.a. x0), that's our deal!
+    predict_xstart = True
     steps = 1000
     scale_beta = 1.  # no scaling
     timestep_respacing = ''  # can be used for ddim sampling, we don't use it.
