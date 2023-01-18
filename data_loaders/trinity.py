@@ -54,7 +54,7 @@ class TrinityDataset(Dataset):
         self.num_clips = current_motion_start_index
 
     def __len__(self):
-        return self.num_clips
+        return 2 # self.num_clips
 
     def __getitem__(self, index):
         motion_index = bisect.bisect_left(self.motion_start_indices, index) - 1

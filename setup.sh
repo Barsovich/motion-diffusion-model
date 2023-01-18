@@ -10,8 +10,8 @@ bash prepare/download_smpl_files.sh
 bash prepare/download_glove.sh
 bash prepare/download_t2m_evaluators.sh
 
+cd dataset
+pip install gdown
+gdown https://drive.google.com/uc?id=1YWrVa1ICoW2IcDCh82EeD_qs2pkCh2nk
+unzip Trinity.zip
 cd ..
-git clone https://github.com/EricGuo5513/HumanML3D.git
-unzip ./HumanML3D/HumanML3D/texts.zip -d ./HumanML3D/HumanML3D/
-cp -r HumanML3D/HumanML3D motion-diffusion-model/dataset/HumanML3D
-cd motion-diffusion-model
