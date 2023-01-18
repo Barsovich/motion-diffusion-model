@@ -1,3 +1,14 @@
+# VSCode
+.vscode
+
+# Data folders
+t2m/
+save/
+kit/
+glove/
+dataset/
+body_models/smpl/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
