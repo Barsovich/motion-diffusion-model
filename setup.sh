@@ -1,5 +1,4 @@
-sudo apt update
-sudo apt install ffmpeg
+sudo apt-get -y install ffmpeg
 
 conda env create -f environment.yml
 conda activate mdm
