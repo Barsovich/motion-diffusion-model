@@ -5,7 +5,7 @@ import numpy as np
 import bisect
 import spacy
 import torch
-
+import math
 
 class TrinityDataset(Dataset):
     def __init__(self,
@@ -14,8 +14,8 @@ class TrinityDataset(Dataset):
                  max_text_length=50,
                  clip_length=5,
                  frame_rate=30,
-                 motion_dir='./dataset/Trinity/motion/',
-                 transcripts_dir='dataset/Trinity/TranscriptsProcessed/'):
+                 motion_dir='./dataset/genea_2022/trn/npz/',
+                 transcripts_dir='./dataset/genea_2022/trn/json/'):
 
         super().__init__()
 
@@ -43,7 +43,7 @@ class TrinityDataset(Dataset):
         current_motion_start_index = 0
         for i in range(self.num_motion_files):
             motion = np.load(motion_files[i])
-            if motion_files[-3:] == "npz":
+            if motion_files[i][-3:] == "npz":
                 filename = next(iter(motion.keys()))
                 motion = motion[filename]
             num_frames = motion.shape[0]
@@ -57,27 +57,49 @@ class TrinityDataset(Dataset):
         self.num_clips = current_motion_start_index
 
     def __len__(self):
-        return 2  # self.num_clips
+        # The first self.num_clips many items are the clips at offset 0
+        # The next self.num_clips many items are the clips at offset (self.num_frames_per_clip // 2)
+        # Instead of the clip of each motion which is actually half size, we give the last full motion
+        return self.num_clips * 2
 
     def __getitem__(self, index):
-        motion_index = bisect.bisect_left(self.motion_start_indices, index) - 1
+        motion_offset = 0
+        if index >= self.num_clips: 
+            # We serve one of the clips with offset
+            index -= self.num_clips
+            motion_offset = self.num_frames_per_clip // 2
+
+        motion_index = bisect.bisect_right(self.motion_start_indices, index) - 1
         index_within_motion = index
         if motion_index > 0:
             index_within_motion -= self.motion_start_indices[motion_index]
 
-        motion = self.motions[motion_index][index_within_motion *
-                                            self.num_frames_per_clip:(index_within_motion + 1) * self.num_frames_per_clip]
-        text = self.transcripts_0_offset[motion_index][index_within_motion]["words"]
+        if motion_offset > 0 and index_within_motion == len(self.motions[motion_index]) // self.num_frames_per_clip - 1:
+            # This is the last motion of the sequence with offset. We serve the last complete motion
+            motion_offset = 0
+
+        motion_start_index = index_within_motion * self.num_frames_per_clip + motion_offset
+        motion = self.motions[motion_index][motion_start_index:motion_start_index + self.num_frames_per_clip]
+
+        transcript = self.transcripts_0_offset[motion_index] if index < self.num_clips else self.transcripts_2_5_offset[motion_index]
+        text = transcript[index_within_motion]["words"] if index_within_motion < len(transcript) else []
+
+        # There are some words that are registered as NaN for some reason
+        text = list(filter(lambda word: isinstance(word, str), text))
+
         parsed_text = self.nlp(" ".join(text))
 
         tokens = []
         for token in parsed_text:
             word = token.text
-            if not word.isalpha():
-                continue
+            split_by_dot = word.split('.')
+            word = split_by_dot[0]
             if (token.pos_ == 'NOUN' or token.pos_ == 'VERB') and (word != 'left'):
                 word = token.lemma_
             tokens.append(word + "/" + token.pos_)
+            if len(split_by_dot) == 2:
+                # There was a dot at the end of the word
+                tokens.append("eos/OTHER")
         tokens += ["unk/OTHER"] * (self.max_text_length - len(tokens))
 
         return {

@@ -47,7 +47,7 @@ def get_model_args(args, data):
         nfeats = 1
     elif args.dataset == 'trinity':
         data_rep = 'hml_vec'
-        njoints = 234
+        njoints = args.njoints
         nfeats = 1
 
     return {'modeltype': '', 'njoints': njoints, 'nfeats': nfeats, 'num_actions': num_actions,

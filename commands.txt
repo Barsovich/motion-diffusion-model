@@ -1,0 +1,3 @@
+scp -i /Users/barissen/.ssh/aws-key.pem -r ~/projects/gesture-diffuser/data/GENEA_2022/trn/npz ubuntu@ec2-35-91-123-22.us-west-2.compute.amazonaws.com:/home/ubuntu/motion-diffusion-model/dataset/genea_2022/trn
+scp -i /Users/barissen/.ssh/aws-key.pem -r ~/projects/gesture-diffuser/data/GENEA_2022/trn/json ubuntu@ec2-35-91-123-22.us-west-2.compute.amazonaws.com:/home/ubuntu/motion-diffusion-model/dataset/genea_2022/trn
+python -m train.train_mdm --save_dir save/trinity2 --dataset trinity --batch_size 2 --num_data_loader_threads 0 --num_steps 5000 --overwrite

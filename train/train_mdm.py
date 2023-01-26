@@ -49,11 +49,13 @@ def main():
     print("Training...")
 
     wandb.init(
-        project=f"MDM_{args.dataset}_{int(time.time())}",
+        project="gesture-diffuser", 
+        entity="barissen",
         config=vars(args),
     )
     TrainLoop(args, train_platform, model, diffusion, data).run_loop()
     train_platform.close()
+    
 
 if __name__ == "__main__":
     main()

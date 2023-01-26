@@ -148,8 +148,9 @@ class TrainLoop:
 
                         wandb.log({k: v})
                         if k == 'loss':
-                            print('step[{}]: loss[{:0.5f}]'.format(
-                                self.step+self.resume_step, v))
+                            pass
+                            # print('step[{}]: loss[{:0.5f}]'.format(
+                            #     self.step+self.resume_step, v))
                         else:
                             self.train_platform.report_scalar(
                                 name=k, value=v, iteration=self.step, group_name='Loss')
