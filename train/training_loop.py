@@ -18,6 +18,7 @@ from diffusion.resample import create_named_schedule_sampler
 from data_loaders.humanml.networks.evaluator_wrapper import EvaluatorMDMWrapper
 from eval import eval_humanml, eval_humanact12_uestc
 from data_loaders.get_data import get_dataset_loader
+import wandb
 
 
 # For ImageNet experiments, this was a good default value.
@@ -142,15 +143,18 @@ class TrainLoop:
                 self.run_step(motion, cond)
                 if self.step % self.log_interval == 0:
                     for k, v in logger.get_current().name2val.items():
+                        if k in ['step', 'samples'] or '_q' in k:
+                            continue  
+
+                        wandb.log({k: v})
                         if k == 'loss':
                             print('step[{}]: loss[{:0.5f}]'.format(
                                 self.step+self.resume_step, v))
-
-                        if k in ['step', 'samples'] or '_q' in k:
-                            continue
                         else:
                             self.train_platform.report_scalar(
                                 name=k, value=v, iteration=self.step, group_name='Loss')
+                            
+                            
 
                 if self.step % self.save_interval == 0:
                     self.save()

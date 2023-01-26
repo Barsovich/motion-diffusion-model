@@ -13,7 +13,7 @@ class TrinityDataset(Dataset):
                  num_frames,
                  max_text_length=50,
                  clip_length=5,
-                 frame_rate=20,
+                 frame_rate=30,
                  motion_dir='./dataset/Trinity/motion/',
                  transcripts_dir='dataset/Trinity/TranscriptsProcessed/'):
 
@@ -43,6 +43,9 @@ class TrinityDataset(Dataset):
         current_motion_start_index = 0
         for i in range(self.num_motion_files):
             motion = np.load(motion_files[i])
+            if motion_files[-3:] == "npz":
+                filename = next(iter(motion.keys()))
+                motion = motion[filename]
             num_frames = motion.shape[0]
             num_frames = num_frames - (num_frames % (self.num_frames_per_clip))
             motion = motion[:num_frames]
@@ -54,7 +57,7 @@ class TrinityDataset(Dataset):
         self.num_clips = current_motion_start_index
 
     def __len__(self):
-        return 2 # self.num_clips
+        return 2  # self.num_clips
 
     def __getitem__(self, index):
         motion_index = bisect.bisect_left(self.motion_start_indices, index) - 1
@@ -66,7 +69,15 @@ class TrinityDataset(Dataset):
                                             self.num_frames_per_clip:(index_within_motion + 1) * self.num_frames_per_clip]
         text = self.transcripts_0_offset[motion_index][index_within_motion]["words"]
         parsed_text = self.nlp(" ".join(text))
-        tokens = [str(i) + "/" + i.pos_ for i in parsed_text]
+
+        tokens = []
+        for token in parsed_text:
+            word = token.text
+            if not word.isalpha():
+                continue
+            if (token.pos_ == 'NOUN' or token.pos_ == 'VERB') and (word != 'left'):
+                word = token.lemma_
+            tokens.append(word + "/" + token.pos_)
         tokens += ["unk/OTHER"] * (self.max_text_length - len(tokens))
 
         return {

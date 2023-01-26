@@ -12,6 +12,8 @@ from train.training_loop import TrainLoop
 from data_loaders.get_data import get_dataset_loader
 from utils.model_util import create_model_and_diffusion
 from train.train_platforms import ClearmlPlatform, TensorboardPlatform, NoPlatform  # required for the eval operation
+import wandb
+import time
 
 def main():
     args = train_args()
@@ -41,8 +43,15 @@ def main():
     model.to(dist_util.dev())
     model.rot2xyz.smpl_model.eval()
 
-    print('Total params: %.2fM' % (sum(p.numel() for p in model.parameters_wo_clip()) / 1000000.0))
+    total_params = (sum(p.numel()
+                    for p in model.parameters_wo_clip()) / 1000000.0)
+    print('Total params: %.2fM' % total_params)
     print("Training...")
+
+    wandb.init(
+        project=f"MDM_{args.dataset}_{int(time.time())}",
+        config=vars(args),
+    )
     TrainLoop(args, train_platform, model, diffusion, data).run_loop()
     train_platform.close()
 
