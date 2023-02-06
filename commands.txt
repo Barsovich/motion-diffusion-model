@@ -1,3 +1,7 @@
 scp -i /Users/barissen/.ssh/aws-key.pem -r ~/projects/gesture-diffuser/data/GENEA_2022/trn/npz ubuntu@ec2-35-91-123-22.us-west-2.compute.amazonaws.com:/home/ubuntu/motion-diffusion-model/dataset/genea_2022/trn
 scp -i /Users/barissen/.ssh/aws-key.pem -r ~/projects/gesture-diffuser/data/GENEA_2022/trn/json ubuntu@ec2-35-91-123-22.us-west-2.compute.amazonaws.com:/home/ubuntu/motion-diffusion-model/dataset/genea_2022/trn
-python -m train.train_mdm --save_dir save/trinity2 --dataset trinity --batch_size 2 --num_data_loader_threads 0 --num_steps 5000 --overwrite
+python -m train.train_mdm --save_dir save/genea_debug --dataset trinity --batch_size 1 --num_data_loader_threads 0 --num_steps 5000 --overwrite
+
+python -m sample.generate --model_path ./save/genea_2022/model000010000.pt --num_samples 10 --num_repetitions 1
+python features2bvh.py --feat_dir ../data/GENEA_2022/sample/samples_genea_2022_000010000_seed10/results.npy --bvh_dir ../data/GENEA_2022/sample/samples_genea_2022_000010000_seed10/inverted.bvh
+python ./example.py "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_genea_2022_000010000_seed10/inverted.bvh" -o "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_genea_2022_000010000_seed10/out.mp4" -m "upper_body"
