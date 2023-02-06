@@ -5,3 +5,4 @@ python -m train.train_mdm --save_dir save/genea_debug --dataset trinity --batch_
 python -m sample.generate --model_path ./save/genea_2022/model000010000.pt --num_samples 10 --num_repetitions 1
 python features2bvh.py --feat_dir ../data/GENEA_2022/sample/samples_genea_2022_000010000_seed10/results.npy --bvh_dir ../data/GENEA_2022/sample/samples_genea_2022_000010000_seed10/inverted.bvh
 python ./example.py "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_genea_2022_000010000_seed10/inverted.bvh" -o "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_genea_2022_000010000_seed10/out.mp4" -m "upper_body"
+
