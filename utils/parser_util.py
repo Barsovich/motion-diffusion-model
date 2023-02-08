@@ -103,6 +103,10 @@ def add_model_options(parser):
                        type=float, help="Joint velocity loss.")
     group.add_argument("--lambda_fc", default=0.0,
                        type=float, help="Foot contact loss.")
+    group.add_argument("--lambda_smooth", default=0.0,
+                       type=float, help="Smooth motion loss.")
+    group.add_argument("--lambda_approx_vel", default=0.0,
+                       type=float, help="Loss for the difference between rotation and translation of target and prediction.")
     group.add_argument("--unconstrained", action='store_true',
                        help="Model is trained unconditionally. That is, it is constrained by neither text nor action. "
                             "Currently tested on HumanAct12 only.")
@@ -143,7 +147,7 @@ def add_training_options(parser):
                        help="If -1, will use all samples in the specified split.")
     group.add_argument("--log_interval", default=1_0, type=int,
                        help="Log losses each N steps")
-    group.add_argument("--save_interval", default=1_000, type=int,
+    group.add_argument("--save_interval", default=5_000, type=int,
                        help="Save checkpoints and run evaluation each N steps")
     group.add_argument("--num_steps", default=40_000, type=int,
                        help="Training will stop after the specified number of steps.")

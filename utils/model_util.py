@@ -94,4 +94,6 @@ def create_gaussian_diffusion(args):
         lambda_vel=args.lambda_vel,
         lambda_rcxyz=args.lambda_rcxyz,
         lambda_fc=args.lambda_fc,
+        lambda_smooth=args.lambda_smooth,
+        lambda_approx_vel=args.lambda_approx_vel
     )

@@ -140,7 +140,11 @@ def main():
         # sample = model.rot2xyz(x=sample, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
         #                        jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
         #                        get_rotations_back=False)
-
+        # breakpoint()
+        sample = sample.cpu()
+        sample[:, ~data.dataset.zero_std, :, :] *= data.dataset.std[:, ~data.dataset.zero_std, None, None].astype('float32')
+        sample += data.dataset.mean[:, :, None, None]
+        
         if args.unconstrained:
             all_text += ['unconstrained'] * args.num_samples
         else:

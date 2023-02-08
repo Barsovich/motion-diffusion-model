@@ -54,6 +54,10 @@ class TrinityDataset(Dataset):
             self.motion_start_indices.append(current_motion_start_index)
             current_motion_start_index += num_frames // self.num_frames_per_clip
 
+        motion_stacked = np.concatenate(self.motions, axis=0)
+        self.mean = np.mean(motion_stacked, axis=0)[None, :]
+        self.std = np.std(motion_stacked, axis=0)[None, :]
+        self.zero_std = np.squeeze(self.std) < 1e-10
         self.num_clips = current_motion_start_index
 
     def __len__(self):
@@ -80,6 +84,9 @@ class TrinityDataset(Dataset):
 
         motion_start_index = index_within_motion * self.num_frames_per_clip + motion_offset
         motion = self.motions[motion_index][motion_start_index:motion_start_index + self.num_frames_per_clip]
+        motion = motion - self.mean 
+        motion_norm = motion / self.std
+        motion_norm[:, self.zero_std] = motion[:, self.zero_std]
 
         transcript = self.transcripts_0_offset[motion_index] if index < self.num_clips else self.transcripts_2_5_offset[motion_index]
         text = transcript[index_within_motion]["words"] if index_within_motion < len(transcript) else []
@@ -105,7 +112,7 @@ class TrinityDataset(Dataset):
         return {
             "text": text,
             "tokens": tokens,
-            "motion": motion,
+            "motion": motion_norm,
         }
 
 
