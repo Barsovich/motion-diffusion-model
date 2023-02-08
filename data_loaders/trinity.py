@@ -7,6 +7,7 @@ import spacy
 import torch
 import math
 
+
 class TrinityDataset(Dataset):
     def __init__(self,
                  split,
@@ -15,7 +16,8 @@ class TrinityDataset(Dataset):
                  clip_length=5,
                  frame_rate=30,
                  motion_dir='./dataset/genea_2022/trn/npz/',
-                 transcripts_dir='./dataset/genea_2022/trn/json/'):
+                 transcripts_dir='./dataset/genea_2022/trn/json/',
+                 audio_dir='dataset/genea_2022/trn/audio/'):
 
         super().__init__()
 
@@ -54,6 +56,17 @@ class TrinityDataset(Dataset):
             self.motion_start_indices.append(current_motion_start_index)
             current_motion_start_index += num_frames // self.num_frames_per_clip
 
+        audio_files = [path.join(audio_dir, f) for f in listdir(
+            audio_dir) if path.isfile(path.join(audio_dir, f))]
+        audio_files.sort()
+        self.audios = []
+        for i in range(self.num_motion_files):
+            audio = np.load(audio_files[i])
+            num_frames = audio.shape[0]
+            num_frames = num_frames - (num_frames % (self.num_frames_per_clip))
+            audio = audio[:num_frames]
+            self.audios.append(audio)
+
         motion_stacked = np.concatenate(self.motions, axis=0)
         self.mean = np.mean(motion_stacked, axis=0)[None, :]
         self.std = np.std(motion_stacked, axis=0)[None, :]
@@ -68,12 +81,13 @@ class TrinityDataset(Dataset):
 
     def __getitem__(self, index):
         motion_offset = 0
-        if index >= self.num_clips: 
+        if index >= self.num_clips:
             # We serve one of the clips with offset
             index -= self.num_clips
             motion_offset = self.num_frames_per_clip // 2
 
-        motion_index = bisect.bisect_right(self.motion_start_indices, index) - 1
+        motion_index = bisect.bisect_right(
+            self.motion_start_indices, index) - 1
         index_within_motion = index
         if motion_index > 0:
             index_within_motion -= self.motion_start_indices[motion_index]
@@ -82,14 +96,19 @@ class TrinityDataset(Dataset):
             # This is the last motion of the sequence with offset. We serve the last complete motion
             motion_offset = 0
 
-        motion_start_index = index_within_motion * self.num_frames_per_clip + motion_offset
-        motion = self.motions[motion_index][motion_start_index:motion_start_index + self.num_frames_per_clip]
-        motion = motion - self.mean 
+        motion_start_index = index_within_motion * \
+            self.num_frames_per_clip + motion_offset
+        motion = self.motions[motion_index][motion_start_index:
+                                            motion_start_index + self.num_frames_per_clip]
+        audio = self.audios[motion_index][motion_start_index:
+                                          motion_start_index + self.num_frames_per_clip]
+        motion = motion - self.mean
         motion_norm = motion / self.std
         motion_norm[:, self.zero_std] = motion[:, self.zero_std]
 
         transcript = self.transcripts_0_offset[motion_index] if index < self.num_clips else self.transcripts_2_5_offset[motion_index]
-        text = transcript[index_within_motion]["words"] if index_within_motion < len(transcript) else []
+        text = transcript[index_within_motion]["words"] if index_within_motion < len(
+            transcript) else []
 
         # There are some words that are registered as NaN for some reason
         text = list(filter(lambda word: isinstance(word, str), text))
@@ -113,19 +132,27 @@ class TrinityDataset(Dataset):
             "text": text,
             "tokens": tokens,
             "motion": motion_norm,
+            "audio": audio
         }
 
 
 def trinity_collate(batch):
     sample_motion = batch[0]["motion"]
+    sample_audio = batch[0]["audio"]
     clip_frame_count = sample_motion.shape[0]
     motion_feature_count = sample_motion.shape[1]
+    audio_feature_count = sample_audio.shape[1]
     batch_size = len(batch)
 
     motion = torch.empty(
         (batch_size, motion_feature_count, 1, clip_frame_count))
     for i in range(batch_size):
         motion[i, :, 0, :] = torch.tensor(batch[i]["motion"].T)
+
+    audio = torch.empty(
+        (batch_size, clip_frame_count, audio_feature_count))
+    for i in range(batch_size):
+        audio[i] = torch.tensor(batch[i]["audio"])
 
     lengths = torch.tensor([clip_frame_count] * batch_size)
     mask = torch.ones((batch_size, 1, 1, clip_frame_count))
@@ -140,7 +167,8 @@ def trinity_collate(batch):
         "lengths": lengths,
         "mask": mask,
         "text": text,
-        "tokens": tokens
+        "tokens": tokens,
+        "audio": audio,
     }}
 
     return motion, cond
