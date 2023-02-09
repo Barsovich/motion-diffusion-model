@@ -129,6 +129,7 @@ class GaussianDiffusion:
         lambda_vel=0.,
         lambda_smooth=0.,
         lambda_approx_vel=0.,
+        lambda_approx_accel=0.,
         lambda_pose=1.,
         lambda_orient=1.,
         lambda_loc=1.,
@@ -153,12 +154,14 @@ class GaussianDiffusion:
         self.lambda_vel = lambda_vel
         self.lambda_smooth = lambda_smooth
         self.lambda_approx_vel = lambda_approx_vel
+        self.lambda_approx_accel = lambda_approx_accel
         self.lambda_root_vel = lambda_root_vel
         self.lambda_vel_rcxyz = lambda_vel_rcxyz
         self.lambda_fc = lambda_fc
 
         if self.lambda_rcxyz > 0. or self.lambda_vel > 0. or self.lambda_root_vel > 0. or \
-                self.lambda_vel_rcxyz > 0. or self.lambda_fc > 0. or self.lambda_smooth > 0. or self.lambda_approx_vel > 0.:
+                self.lambda_vel_rcxyz > 0. or self.lambda_fc > 0. or self.lambda_smooth > 0. or self.lambda_approx_vel > 0. or \
+                self.lambda_approx_accel > 0.:
             assert self.loss_type == LossType.MSE, 'Geometric losses are supported by MSE loss type only!'
 
         # Use float64 for accuracy.
@@ -1322,10 +1325,13 @@ class GaussianDiffusion:
                 model_output_xyz = get_xyz(model_output)  # [bs, nvertices, 3, nframes]
                 terms["rcxyz_mse"] = self.masked_l2(target_xyz, model_output_xyz, mask)  # mean_flat((target_xyz - model_output_xyz) ** 2)
 
-            if self.lambda_smooth > 0. or self.lambda_approx_vel > 0.:
+            if self.lambda_smooth > 0. or self.lambda_approx_vel > 0. or self.lambda_approx_accel > 0.:
                 model_output_diff = model_output[:, :, :, 1:] - model_output[:, :, :, :-1]
                 if self.lambda_smooth > 0.:
                     terms["diff_between_frames"] = self.masked_average_sum(torch.abs(model_output_diff), mask[:, :, :, 1:]) 
+                if self.lambda_approx_accel > 0.:
+                    diff_of_diff = model_output_diff[:, :, :, 1:] - model_output_diff[:, :, :, :-1]
+                    terms["diff_of_diff_between_frames"] = self.masked_average_sum(torch.abs(diff_of_diff), mask[:, :, :, 2:]) 
                 if self.lambda_approx_vel > 0.:
                     target_diff = target[:, :, :, 1:] - target[:, :, :, :-1]
                     terms["velocity_diff_between_target_and_model"] = self.masked_l2(model_output_diff, target_diff, mask[:, :, :, 1:])

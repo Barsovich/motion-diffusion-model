@@ -106,7 +106,9 @@ def add_model_options(parser):
     group.add_argument("--lambda_smooth", default=0.0,
                        type=float, help="Smooth motion loss.")
     group.add_argument("--lambda_approx_vel", default=0.0,
-                       type=float, help="Loss for the difference between rotation and translation of target and prediction.")
+                       type=float, help="Approximate velocity loss.")
+    group.add_argument("--lambda_approx_accel", default=0.0,
+                       type=float, help="Approximate acceleration loss.")
     group.add_argument("--unconstrained", action='store_true',
                        help="Model is trained unconditionally. That is, it is constrained by neither text nor action. "
                             "Currently tested on HumanAct12 only.")
