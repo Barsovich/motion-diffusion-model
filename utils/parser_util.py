@@ -92,7 +92,7 @@ def add_model_options(parser):
                             " (in addition to cross-attention).")
     group.add_argument("--layers", default=8, type=int,
                        help="Number of layers.")
-    group.add_argument("--latent_dim", default=512, type=int,
+    group.add_argument("--latent_dim", default=960, type=int,
                        help="Transformer/GRU width.")
     group.add_argument("--cond_mask_prob", default=.1, type=float,
                        help="The probability of masking the condition during training."

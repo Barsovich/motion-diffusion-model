@@ -29,11 +29,10 @@ class TrinityDataset(Dataset):
         self.frame_rate = frame_rate
         self.max_text_length = max_text_length
         self.num_frames_per_clip = clip_length * frame_rate
-        self.nlp = spacy.load("en_core_web_sm")
 
-        with open(path.join(transcripts_dir, "processed_words_into_sections_5s_offset0s.json")) as f:
+        with open(path.join(transcripts_dir, "processed_words_into_sections_with_indices_5s_offset0s.json")) as f:
             self.transcripts_0_offset = json.load(f)
-        with open(path.join(transcripts_dir, "processed_words_into_sections_5s_offset25s.json")) as f:
+        with open(path.join(transcripts_dir, "processed_words_into_sections_with_indices_5s_offset25s.json")) as f:
             self.transcripts_2_5_offset = json.load(f)
 
         motion_files = [path.join(motion_dir, f) for f in listdir(
@@ -109,28 +108,15 @@ class TrinityDataset(Dataset):
         transcript = self.transcripts_0_offset[motion_index] if index < self.num_clips else self.transcripts_2_5_offset[motion_index]
         text = transcript[index_within_motion]["words"] if index_within_motion < len(
             transcript) else []
+        text_indices = transcript[index_within_motion]["indices"] if index_within_motion < len(
+            transcript) else []
 
         # There are some words that are registered as NaN for some reason
-        text = list(filter(lambda word: isinstance(word, str), text))
-
-        parsed_text = self.nlp(" ".join(text))
-
-        tokens = []
-        for token in parsed_text:
-            word = token.text
-            split_by_dot = word.split('.')
-            word = split_by_dot[0]
-            if (token.pos_ == 'NOUN' or token.pos_ == 'VERB') and (word != 'left'):
-                word = token.lemma_
-            tokens.append(word + "/" + token.pos_)
-            if len(split_by_dot) == 2:
-                # There was a dot at the end of the word
-                tokens.append("eos/OTHER")
-        tokens += ["unk/OTHER"] * (self.max_text_length - len(tokens))
+        text = [(text[i] if isinstance(text[i], str) else "uh") for i in range(len(text))]
 
         return {
             "text": text,
-            "tokens": tokens,
+            "text_indices": text_indices,
             "motion": motion_norm,
             "audio": audio
         }
@@ -158,17 +144,17 @@ def trinity_collate(batch):
     mask = torch.ones((batch_size, 1, 1, clip_frame_count))
 
     text = []
-    tokens = []
+    text_indices = []
     for i in range(batch_size):
         text.append(" ".join(batch[i]["text"]))
-        tokens.append("_".join(batch[i]["tokens"]))
+        text_indices.append(batch[i]["text_indices"])
 
     cond = {'y': {
         "lengths": lengths,
         "mask": mask,
         "text": text,
-        "tokens": tokens,
         "audio": audio,
+        "text_indices": text_indices,
     }}
 
     return motion, cond

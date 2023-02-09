@@ -7,7 +7,7 @@ def load_model_wo_clip(model, state_dict):
     missing_keys, unexpected_keys = model.load_state_dict(
         state_dict, strict=False)
     assert len(unexpected_keys) == 0
-    assert all([k.startswith('clip_model.') for k in missing_keys])
+    # assert all([k.startswith('clip_model.') for k in missing_keys])
 
 
 def create_model_and_diffusion(args, data):
@@ -95,5 +95,6 @@ def create_gaussian_diffusion(args):
         lambda_rcxyz=args.lambda_rcxyz,
         lambda_fc=args.lambda_fc,
         lambda_smooth=args.lambda_smooth,
-        lambda_approx_vel=args.lambda_approx_vel
+        lambda_approx_vel=args.lambda_approx_vel,
+        lambda_approx_accel=args.lambda_approx_accel
     )
