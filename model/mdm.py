@@ -4,15 +4,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 import clip
 from model.rotation2xyz import Rotation2xyz
-
+from transformers import AutoTokenizer, GPT2Model
 
 
 class MDM(nn.Module):
     def __init__(self, modeltype, njoints, nfeats, num_actions, translation, pose_rep, glob, glob_rot,
-                 latent_dim=256, ff_size=1024, num_layers=8, num_heads=4, dropout=0.1,
+                 latent_dim=960, ff_size=1024, num_layers=8, num_heads=4, dropout=0.1,
                  ablation=None, activation="gelu", legacy=False, data_rep='rot6d', dataset='amass', clip_dim=512,
                  arch='trans_enc', emb_trans_dec=False, clip_version=None, **kargs):
         super().__init__()
+        # breakpoint()
 
         self.legacy = legacy
         self.modeltype = modeltype
@@ -81,11 +82,25 @@ class MDM(nn.Module):
 
         if self.cond_mode != 'no_cond':
             if 'text' in self.cond_mode:
-                self.embed_text = nn.Linear(self.clip_dim, self.latent_dim)
-                print('EMBED TEXT')
-                print('Loading CLIP...')
-                self.clip_version = clip_version
-                self.clip_model = self.load_and_freeze_clip(clip_version)
+                self.gpt = GPT2Model.from_pretrained("gpt2")
+                self.gpt.eval()
+                for param in self.gpt.parameters():
+                    param.requires_grad = False
+                self.gpt_embed_dim = 768
+                self.intermediate_word_embed_dim = 64
+                self.text_section_embedding_dim = 32
+                self.section_count = 10
+                self.max_tokens_per_section = 6
+                self.frames_per_section = 15
+                self.audio_in_dim = 30
+                self.audio_section_embedding_dim = 64
+
+                self.mlp_for_word_embedding = MLP(self.gpt_embed_dim, self.intermediate_word_embed_dim) 
+                self.mlp_for_section_embedding = MLP(self.intermediate_word_embed_dim * self.max_tokens_per_section, self.text_section_embedding_dim) 
+
+                self.mlp_for_audio_embedding = MLP(self.audio_in_dim * self.frames_per_section, self.audio_section_embedding_dim)
+            
+
             if 'action' in self.cond_mode:
                 self.embed_action = EmbedAction(self.num_actions, self.latent_dim)
                 print('EMBED ACTION')
@@ -93,7 +108,7 @@ class MDM(nn.Module):
         self.output_process = OutputProcess(self.data_rep, self.input_feats, self.latent_dim, self.njoints,
                                             self.nfeats)
 
-        self.rot2xyz = Rotation2xyz(device='cpu', dataset=self.dataset)
+        # self.rot2xyz = Rotation2xyz(device='cpu', dataset=self.dataset)
 
     def parameters_wo_clip(self):
         return [p for name, p in self.named_parameters() if not name.startswith('clip_model.')]
@@ -121,22 +136,25 @@ class MDM(nn.Module):
         else:
             return cond
 
-    def encode_text(self, raw_text):
-        # raw_text - list (batch_size length) of strings with input text prompts
-        device = next(self.parameters()).device
-        max_text_len = 20 if self.dataset in ['humanml', 'kit'] else None  # Specific hardcoding for humanml dataset
-        if max_text_len is not None:
-            default_context_length = 77
-            context_length = max_text_len + 2 # start_token + 20 + end_token
-            assert context_length < default_context_length
-            texts = clip.tokenize(raw_text, context_length=context_length, truncate=True).to(device) # [bs, context_length] # if n_tokens > context_length -> will truncate
-            # print('texts', texts.shape)
-            zero_pad = torch.zeros([texts.shape[0], default_context_length-context_length], dtype=texts.dtype, device=texts.device)
-            texts = torch.cat([texts, zero_pad], dim=1)
-            # print('texts after pad', texts.shape, texts)
-        else:
-            texts = clip.tokenize(raw_text, truncate=True).to(device) # [bs, context_length] # if n_tokens > 77 -> will truncate
-        return self.clip_model.encode_text(texts).float()
+    def encode_text(self, tokens, indices):
+        bs = len(indices)
+        out = self.gpt(**tokens).last_hidden_state # [bs, seq_len, gpt_embed_dim]
+        out = self.mlp_for_word_embedding(out) # [bs, seq_len, intermediate_word_embed_dim]
+        out_sectionized = torch.zeros((bs, self.section_count * self.max_tokens_per_section, self.intermediate_word_embed_dim), device=out.device)
+        for i in range(out.shape[0]):
+            out_sectionized[i, indices[i]] = out[i, :len(indices[i])]
+
+        out_sectionized = torch.reshape(out_sectionized, (bs, self.section_count, -1)) # [bs, section_count, intermediate_word_embed_dim * max_tokens_per_section]
+        
+        out_sectionized = self.mlp_for_section_embedding(out_sectionized) # [bs, section_count, text_section_embedding_dim]
+        return out_sectionized
+
+    def encode_audio(self, audio):
+        bs = audio.shape[0]
+        # audio = [bs, frame_count, audio_in_dim]
+        out = torch.reshape(audio, (bs, self.section_count, -1))
+        out = self.mlp_for_audio_embedding(out)
+        return out
 
     def forward(self, x, timesteps, y=None):
         """
@@ -148,8 +166,11 @@ class MDM(nn.Module):
 
         force_mask = y.get('uncond', False)
         if 'text' in self.cond_mode:
-            enc_text = self.encode_text(y['text'])
-            emb += self.embed_text(self.mask_cond(enc_text, force_mask=force_mask))
+            enc_text = self.encode_text(y['tokens'], y['text_indices'])
+            enc_audio = self.encode_audio(y['audio'])
+            enc_cond = torch.cat((enc_text, enc_audio), axis=2)
+            enc_cond = enc_cond.reshape((bs, -1))
+            emb += self.mask_cond(enc_cond, force_mask=force_mask)
         if 'action' in self.cond_mode:
             action_emb = self.embed_action(y['action'])
             emb += self.mask_cond(action_emb, force_mask=force_mask)
@@ -190,13 +211,28 @@ class MDM(nn.Module):
 
     def _apply(self, fn):
         super()._apply(fn)
-        self.rot2xyz.smpl_model._apply(fn)
+        # self.rot2xyz.smpl_model._apply(fn)
 
 
     def train(self, *args, **kwargs):
         super().train(*args, **kwargs)
-        self.rot2xyz.smpl_model.train(*args, **kwargs)
+        # self.rot2xyz.smpl_model.train(*args, **kwargs)
 
+class MLP(nn.Module):
+    """ MLP as used in Vision Transformer, MLP-Mixer and related networks
+    """
+    def __init__(self, in_features, out_features=None, act_layer=nn.GELU, norm_layer=nn.LayerNorm, bias=True, drop=0.):
+        super().__init__()
+        out_features = out_features or in_features
+        self.fc1 = nn.Linear(in_features, out_features, bias)
+        self.act = act_layer()
+        self.norm = norm_layer(out_features)
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.act(x)
+        x = self.norm(x)
+        return x
 
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, dropout=0.1, max_len=5000):

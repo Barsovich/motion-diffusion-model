@@ -1373,7 +1373,8 @@ class GaussianDiffusion:
                             (self.lambda_rcxyz * terms.get('rcxyz_mse', 0.)) +\
                             (self.lambda_fc * terms.get('fc', 0.)) +\
                             (self.lambda_smooth * terms.get('diff_between_frames', 0.)) +\
-                            (self.lambda_approx_vel * terms.get('velocity_diff_between_target_and_model', 0.))
+                            (self.lambda_approx_vel * terms.get('velocity_diff_between_target_and_model', 0.)) +\
+                            (self.lambda_approx_accel * terms.get('diff_of_diff_between_frames', 0.))
 
         else:
             raise NotImplementedError(self.loss_type)
