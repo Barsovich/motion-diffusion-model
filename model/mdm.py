@@ -99,7 +99,7 @@ class MDM(nn.Module):
                 self.mlp_for_section_embedding = MLP(self.intermediate_word_embed_dim * self.max_tokens_per_section, self.text_section_embedding_dim) 
 
                 self.mlp_for_audio_embedding = MLP(self.audio_in_dim * self.frames_per_section, self.audio_section_embedding_dim)
-            
+                self.final_layer_norm_for_cond = nn.LayerNorm(self.audio_section_embedding_dim + self.text_section_embedding_dim)
 
             if 'action' in self.cond_mode:
                 self.embed_action = EmbedAction(self.num_actions, self.latent_dim)
@@ -169,6 +169,7 @@ class MDM(nn.Module):
             enc_text = self.encode_text(y['tokens'], y['text_indices'])
             enc_audio = self.encode_audio(y['audio'])
             enc_cond = torch.cat((enc_text, enc_audio), axis=2)
+            enc_cond = self.final_layer_norm_for_cond(enc_cond)
             enc_cond = enc_cond.reshape((bs, -1))
             emb += self.mask_cond(enc_cond, force_mask=force_mask)
         if 'action' in self.cond_mode:
@@ -229,9 +230,9 @@ class MLP(nn.Module):
         self.norm = norm_layer(out_features)
 
     def forward(self, x):
+        x = self.norm(x)
         x = self.fc1(x)
         x = self.act(x)
-        x = self.norm(x)
         return x
 
 class PositionalEncoding(nn.Module):
