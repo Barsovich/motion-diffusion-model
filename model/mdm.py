@@ -87,8 +87,8 @@ class MDM(nn.Module):
                 for param in self.gpt.parameters():
                     param.requires_grad = False
                 self.gpt_embed_dim = 768
-                self.intermediate_word_embed_dim = 64
                 self.text_section_embedding_dim = 32
+                self.intermediate_word_embed_dim = self.text_section_embedding_dim
                 self.section_count = 10
                 self.max_tokens_per_section = 6
                 self.frames_per_section = 15
@@ -96,6 +96,7 @@ class MDM(nn.Module):
                 self.audio_section_embedding_dim = 64
 
                 self.mlp_for_word_embedding = MLP(self.gpt_embed_dim, self.intermediate_word_embed_dim) 
+                self.max_pool = nn.MaxPool1d(self.max_tokens_per_section, stride=self.max_tokens_per_section)
                 self.mlp_for_section_embedding = MLP(self.intermediate_word_embed_dim * self.max_tokens_per_section, self.text_section_embedding_dim) 
 
                 self.mlp_for_audio_embedding = MLP(self.audio_in_dim * self.frames_per_section, self.audio_section_embedding_dim)
@@ -144,10 +145,9 @@ class MDM(nn.Module):
         out_sectionized = torch.zeros((bs, self.section_count * self.max_tokens_per_section, self.intermediate_word_embed_dim), device=out.device)
         for i in range(out.shape[0]):
             out_sectionized[i, indices[i]] = out[i, :len(indices[i])]
-
-        out_sectionized = torch.reshape(out_sectionized, (bs, self.section_count, -1)) # [bs, section_count, intermediate_word_embed_dim * max_tokens_per_section]
-        
-        out_sectionized = self.mlp_for_section_embedding(out_sectionized) # [bs, section_count, text_section_embedding_dim]
+        out_sectionized = out_sectionized.permute((0, 2, 1))
+        out_sectionized = self.max_pool(out_sectionized)
+        out_sectionized = out_sectionized.permute((0, 2, 1))        
         return out_sectionized
 
     def encode_audio(self, audio):
