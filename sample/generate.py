@@ -17,6 +17,7 @@ import data_loaders.humanml.utils.paramUtil as paramUtil
 from data_loaders.humanml.utils.plot_script import plot_3d_motion
 import shutil
 from data_loaders.tensors import collate
+from transformers import AutoTokenizer
 
 
 def main():
@@ -78,17 +79,26 @@ def main():
     model, diffusion = create_model_and_diffusion(args, data)
 
     print(f"Loading checkpoints from [{args.model_path}]...")
-    state_dict = torch.load(args.model_path, map_location='cpu')
+    state_dict = torch.load(args.model_path, map_location=torch.device(args.device))
     load_model_wo_clip(model, state_dict)
+
+
+    tokenizer = AutoTokenizer.from_pretrained("gpt2")
+    tokenizer.pad_token = tokenizer.eos_token
 
     if args.guidance_param != 1:
         model = ClassifierFreeSampleModel(model)   # wrapping model with the classifier-free sampler
-    model.to(dist_util.dev())
+    model.to(args.device)
     model.eval()  # disable random masking
 
     if is_using_data:
         iterator = iter(data)
         _, model_kwargs = next(iterator)
+        model_kwargs['y'] = {key: val.to(args.device) if torch.is_tensor(
+            val) else val for key, val in model_kwargs['y'].items()}
+        model_kwargs['y']["tokens"] = tokenizer(model_kwargs['y']["text"], padding=True, return_tensors="pt")
+        model_kwargs['y']['tokens'] = {key: val.to(args.device) if torch.is_tensor(
+            val) else val for key, val in model_kwargs['y']['tokens'].items()}
     else:
         collate_args = [{'inp': torch.zeros(n_frames), 'tokens': None, 'lengths': n_frames}] * args.num_samples
         is_t2m = any([args.input_text, args.text_prompt])
@@ -102,6 +112,7 @@ def main():
                             arg, one_action, one_action_text in zip(collate_args, action, action_text)]
         _, model_kwargs = collate(collate_args)
 
+
     all_motions = []
     all_lengths = []
     all_text = []
@@ -111,7 +122,7 @@ def main():
 
         # add CFG scale to batch
         if args.guidance_param != 1:
-            model_kwargs['y']['scale'] = torch.ones(args.batch_size, device=dist_util.dev()) * args.guidance_param
+            model_kwargs['y']['scale'] = torch.ones(args.batch_size, device=torch.device(args.device)) * args.guidance_param
 
         sample_fn = diffusion.p_sample_loop
 
