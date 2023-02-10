@@ -224,17 +224,19 @@ class MDM(nn.Module):
 class MLP(nn.Module):
     """ MLP as used in Vision Transformer, MLP-Mixer and related networks
     """
-    def __init__(self, in_features, out_features=None, act_layer=nn.GELU, norm_layer=nn.LayerNorm, bias=True, drop=0.):
+    def __init__(self, in_features, out_features=None, act_layer=nn.GELU, norm_layer=nn.LayerNorm, bias=False, drop=0.1):
         super().__init__()
         out_features = out_features or in_features
-        self.norm = norm_layer(in_features)
         self.fc1 = nn.Linear(in_features, out_features, bias)
         self.act = act_layer()
+        self.norm = norm_layer(out_features)
+        self.dropout = nn.Dropout(drop)
 
     def forward(self, x):
-        x = self.norm(x)
         x = self.fc1(x)
+        x = self.norm(x)
         x = self.act(x)
+        x = self.dropout(x)
         return x
 
 class PositionalEncoding(nn.Module):

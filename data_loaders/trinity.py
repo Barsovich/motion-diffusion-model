@@ -72,6 +72,13 @@ class TrinityDataset(Dataset):
         self.zero_std = np.squeeze(self.std) < 1e-10
         self.num_clips = current_motion_start_index
 
+
+        audio_stacked = np.concatenate(self.audios, axis=0)
+        self.audio_mean = np.mean(audio_stacked, axis=0)[None, :]
+        self.audio_std = np.std(audio_stacked, axis=0)[None, :]
+        self.audio_zero_std = np.squeeze(self.audio_std) < 1e-10
+
+
     def __len__(self):
         # The first self.num_clips many items are the clips at offset 0
         # The next self.num_clips many items are the clips at offset (self.num_frames_per_clip // 2)
@@ -105,6 +112,10 @@ class TrinityDataset(Dataset):
         motion_norm = motion / self.std
         motion_norm[:, self.zero_std] = motion[:, self.zero_std]
 
+        audio = audio - self.audio_mean
+        audio_norm = audio / self.audio_std
+        audio_norm[:, self.audio_zero_std] = audio[:, self.audio_zero_std]
+
         transcript = self.transcripts_0_offset[motion_index] if index < self.num_clips else self.transcripts_2_5_offset[motion_index]
         text = transcript[index_within_motion]["words"] if index_within_motion < len(
             transcript) else []
@@ -118,7 +129,7 @@ class TrinityDataset(Dataset):
             "text": text,
             "text_indices": text_indices,
             "motion": motion_norm,
-            "audio": audio
+            "audio": audio_norm
         }
 
 
