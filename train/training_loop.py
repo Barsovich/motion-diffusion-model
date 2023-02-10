@@ -63,7 +63,7 @@ class TrainLoop:
             fp16_scale_growth=self.fp16_scale_growth,
         )
 
-        self.tokenizer = AutoTokenizer.from_pretrained("gpt2")
+        self.tokenizer = AutoTokenizer.from_pretrained("bert-base-cased")
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
         self.save_dir = args.save_dir

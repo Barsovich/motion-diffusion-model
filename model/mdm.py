@@ -90,7 +90,7 @@ class MDM(nn.Module):
                 self.text_section_embedding_dim = 32
                 self.intermediate_word_embed_dim = self.text_section_embedding_dim
                 self.section_count = 10
-                self.max_tokens_per_section = 6
+                self.max_tokens_per_section = 7
                 self.frames_per_section = 15
                 self.audio_in_dim = 30
                 self.audio_section_embedding_dim = 64

@@ -30,10 +30,11 @@ class TrinityDataset(Dataset):
         self.max_text_length = max_text_length
         self.num_frames_per_clip = clip_length * frame_rate
 
-        with open(path.join(transcripts_dir, "processed_words_into_sections_with_indices_5s_offset0s.json")) as f:
-            self.transcripts_0_offset = json.load(f)
-        with open(path.join(transcripts_dir, "processed_words_into_sections_with_indices_5s_offset25s.json")) as f:
-            self.transcripts_2_5_offset = json.load(f)
+        self.num_offsets = 10
+        self.transcripts = []
+        for i in range(self.num_offsets):
+            with open(path.join(transcripts_dir, f"text_5s_offset_{i}_s.json")) as f:
+                self.transcripts.append(json.load(f))
 
         motion_files = [path.join(motion_dir, f) for f in listdir(
             motion_dir) if path.isfile(path.join(motion_dir, f))]
@@ -83,14 +84,14 @@ class TrinityDataset(Dataset):
         # The first self.num_clips many items are the clips at offset 0
         # The next self.num_clips many items are the clips at offset (self.num_frames_per_clip // 2)
         # Instead of the clip of each motion which is actually half size, we give the last full motion
-        return self.num_clips * 2
+        return self.num_clips * self.num_offsets
 
     def __getitem__(self, index):
         motion_offset = 0
-        if index >= self.num_clips:
-            # We serve one of the clips with offset
-            index -= self.num_clips
-            motion_offset = self.num_frames_per_clip // 2
+        # We serve one of the clips with offset
+        index = index % self.num_clips
+        offset = index / self.num_clips
+        motion_offset = self.num_frames_per_clip * (offset // self.num_offsets)              
 
         motion_index = bisect.bisect_right(
             self.motion_start_indices, index) - 1
@@ -101,6 +102,7 @@ class TrinityDataset(Dataset):
         if motion_offset > 0 and index_within_motion == len(self.motions[motion_index]) // self.num_frames_per_clip - 1:
             # This is the last motion of the sequence with offset. We serve the last complete motion
             motion_offset = 0
+            offset = 0
 
         motion_start_index = index_within_motion * \
             self.num_frames_per_clip + motion_offset
@@ -116,14 +118,11 @@ class TrinityDataset(Dataset):
         audio_norm = audio / self.audio_std
         audio_norm[:, self.audio_zero_std] = audio[:, self.audio_zero_std]
 
-        transcript = self.transcripts_0_offset[motion_index] if index < self.num_clips else self.transcripts_2_5_offset[motion_index]
-        text = transcript[index_within_motion]["words"] if index_within_motion < len(
-            transcript) else []
+        transcript = self.transcripts[offset]
+        text = transcript[index_within_motion]["section_text"] if index_within_motion < len(
+            transcript) else ""
         text_indices = transcript[index_within_motion]["indices"] if index_within_motion < len(
             transcript) else []
-
-        # There are some words that are registered as NaN for some reason
-        text = [(text[i] if isinstance(text[i], str) else "uh") for i in range(len(text))]
 
         return {
             "text": text,
@@ -157,7 +156,7 @@ def trinity_collate(batch):
     text = []
     text_indices = []
     for i in range(batch_size):
-        text.append(" ".join(batch[i]["text"]))
+        text.append(batch[i]["text"])
         text_indices.append(batch[i]["text_indices"])
 
     cond = {'y': {
