@@ -10,11 +10,9 @@ from transformers import AutoTokenizer, GPT2Model
 class MDM(nn.Module):
     def __init__(self, modeltype, njoints, nfeats, num_actions, translation, pose_rep, glob, glob_rot,
                  latent_dim=960, ff_size=1024, num_layers=8, num_heads=4, dropout=0.1,
-                 latent_dim=960, ff_size=1024, num_layers=8, num_heads=4, dropout=0.1,
                  ablation=None, activation="gelu", legacy=False, data_rep='rot6d', dataset='amass', clip_dim=512,
                  arch='trans_enc', emb_trans_dec=False, clip_version=None, **kargs):
         super().__init__()
-        # breakpoint()
         # breakpoint()
 
         self.legacy = legacy
@@ -112,7 +110,6 @@ class MDM(nn.Module):
                                             self.nfeats)
 
         # self.rot2xyz = Rotation2xyz(device='cpu', dataset=self.dataset)
-        # self.rot2xyz = Rotation2xyz(device='cpu', dataset=self.dataset)
 
     def parameters_wo_clip(self):
         return [p for name, p in self.named_parameters() if not name.startswith('clip_model.')]
@@ -140,25 +137,6 @@ class MDM(nn.Module):
         else:
             return cond
 
-    def encode_text(self, tokens, indices):
-        bs = len(indices)
-        out = self.gpt(**tokens).last_hidden_state # [bs, seq_len, gpt_embed_dim]
-        out = self.mlp_for_word_embedding(out) # [bs, seq_len, intermediate_word_embed_dim]
-        out_sectionized = torch.zeros((bs, self.section_count * self.max_tokens_per_section, self.intermediate_word_embed_dim), device=out.device)
-        for i in range(out.shape[0]):
-            out_sectionized[i, indices[i]] = out[i, :len(indices[i])]
-
-        out_sectionized = torch.reshape(out_sectionized, (bs, self.section_count, -1)) # [bs, section_count, intermediate_word_embed_dim * max_tokens_per_section]
-        
-        out_sectionized = self.mlp_for_section_embedding(out_sectionized) # [bs, section_count, text_section_embedding_dim]
-        return out_sectionized
-
-    def encode_audio(self, audio):
-        bs = audio.shape[0]
-        # audio = [bs, frame_count, audio_in_dim]
-        out = torch.reshape(audio, (bs, self.section_count, -1))
-        out = self.mlp_for_audio_embedding(out)
-        return out
     def encode_text(self, tokens, indices):
         bs = len(indices)
         out = self.gpt(**tokens).last_hidden_state # [bs, seq_len, gpt_embed_dim]
@@ -249,20 +227,9 @@ class MLP(nn.Module):
     def __init__(self, in_features, out_features=None, act_layer=nn.GELU, norm_layer=nn.LayerNorm, bias=True, drop=0.):
         super().__init__()
         out_features = out_features or in_features
+        self.norm = norm_layer(in_features)
         self.fc1 = nn.Linear(in_features, out_features, bias)
         self.act = act_layer()
-        self.norm = norm_layer(out_features)
-        # self.rot2xyz.smpl_model.train(*args, **kwargs)
-
-class MLP(nn.Module):
-    """ MLP as used in Vision Transformer, MLP-Mixer and related networks
-    """
-    def __init__(self, in_features, out_features=None, act_layer=nn.GELU, norm_layer=nn.LayerNorm, bias=True, drop=0.):
-        super().__init__()
-        out_features = out_features or in_features
-        self.fc1 = nn.Linear(in_features, out_features, bias)
-        self.act = act_layer()
-        self.norm = norm_layer(out_features)
 
     def forward(self, x):
         x = self.norm(x)
