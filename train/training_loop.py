@@ -29,7 +29,7 @@ INITIAL_LOG_LOSS_SCALE = 20.0
 
 
 class TrainLoop:
-    def __init__(self, args, train_platform, model, diffusion, data):
+    def __init__(self, args, train_platform, model, diffusion, data, val_data):
         self.args = args
         self.dataset = args.dataset
         self.train_platform = train_platform
@@ -37,6 +37,7 @@ class TrainLoop:
         self.diffusion = diffusion
         self.cond_mode = model.cond_mode
         self.data = data
+        self.val_data = val_data
         self.batch_size = args.batch_size
         self.microbatch = args.batch_size  # deprecating this option
         self.lr = args.lr
@@ -165,13 +166,10 @@ class TrainLoop:
                         else:
                             self.train_platform.report_scalar(
                                 name=k, value=v, iteration=self.step, group_name='Loss')
-                            
-                            
-
                 if self.step % self.save_interval == 0:
                     self.save()
                     self.model.eval()
-                    self.evaluate()
+                    self.validation()
                     self.model.train()
 
                     # Run for a finite amount of time in integration tests.
@@ -184,6 +182,45 @@ class TrainLoop:
         if (self.step - 1) % self.save_interval != 0:
             self.save()
             self.evaluate()
+
+    def validation(self):
+        for motion, cond in tqdm(self.val_data):
+            motion = motion.to(self.device)
+            cond['y'] = {key: val.to(self.device) if torch.is_tensor(
+                val) else val for key, val in cond['y'].items()}
+
+            cond['y']["tokens"] = self.tokenizer(cond['y']["text"], padding=True, return_tensors="pt")
+            cond['y']['tokens'] = {key: val.to(self.device) if torch.is_tensor(
+                val) else val for key, val in cond['y']['tokens'].items()}
+
+            for i in range(0, batch.shape[0], self.microbatch):
+                # Eliminates the microbatch feature
+                assert i == 0
+                assert self.microbatch == self.batch_size
+                micro = batch
+                micro_cond = cond
+                last_batch = (i + self.microbatch) >= batch.shape[0]
+                t, weights = self.schedule_sampler.sample(
+                    micro.shape[0], dist_util.dev())
+
+                compute_losses = functools.partial(
+                    self.diffusion.training_losses,
+                    self.ddp_model,
+                    micro,  # [bs, ch, image_size, image_size]
+                    t,  # [bs](int) sampled timesteps
+                    model_kwargs=micro_cond,
+                    dataset=self.data.dataset
+                )
+
+                if last_batch or not self.use_ddp:
+                    losses = compute_losses()
+                else:
+                    with self.ddp_model.no_sync():
+                        losses = compute_losses()
+
+                loss = (losses["loss"] * weights).mean()
+                
+
 
     def evaluate(self):
         if not self.args.eval_during_training:
@@ -268,10 +305,10 @@ class TrainLoop:
                 )
 
             loss = (losses["loss"] * weights).mean()
-            log_loss_dict(
-                self.diffusion, t, {k: v * weights for k, v in losses.items()}
-            )
-            self.mp_trainer.backward(loss)
+            losses_weighted = {k: v * weights for k, v in losses.items()}
+            for k, v in losses_weighted.items():
+                wandb.log({"val_k": v})
+            
 
     def _anneal_lr(self):
         if not self.lr_anneal_steps:

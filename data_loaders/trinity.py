@@ -15,16 +15,16 @@ class TrinityDataset(Dataset):
                  max_text_length=50,
                  clip_length=5,
                  frame_rate=30,
-                 motion_dir='./dataset/genea_2022/trn/npz/',
-                 transcripts_dir='./dataset/genea_2022/trn/json/',
-                 audio_dir='dataset/genea_2022/trn/audio/'):
+                 data_dir = './dataset/genea_2022/'):
 
         super().__init__()
 
         self.split = split
         self.num_frames = num_frames
-        self.motion_dir = motion_dir
-        self.transcripts_dir = transcripts_dir
+        self.motion_dir = path.join(dir, split, 'npz')
+        self.audio_dir = path.join(dir, split, 'audio')
+        self.transcripts_dir = path.join(dir, split, 'json')
+
         self.clip_length = clip_length
         self.frame_rate = frame_rate
         self.max_text_length = max_text_length
