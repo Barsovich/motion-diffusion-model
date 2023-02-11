@@ -65,7 +65,7 @@ class TrainLoop:
         )
 
         self.tokenizer = AutoTokenizer.from_pretrained("bert-base-cased")
-        self.tokenizer.pad_token = self.tokenizer.eos_token
+        self.tokenizer.add_special_tokens({'pad_token': '[PAD]'})
 
         self.save_dir = args.save_dir
         self.overwrite = args.overwrite
@@ -193,13 +193,13 @@ class TrainLoop:
             cond['y']['tokens'] = {key: val.to(self.device) if torch.is_tensor(
                 val) else val for key, val in cond['y']['tokens'].items()}
 
-            for i in range(0, batch.shape[0], self.microbatch):
+            for i in range(0, motion.shape[0], self.microbatch):
                 # Eliminates the microbatch feature
                 assert i == 0
                 assert self.microbatch == self.batch_size
-                micro = batch
+                micro = motion
                 micro_cond = cond
-                last_batch = (i + self.microbatch) >= batch.shape[0]
+                last_batch = (i + self.microbatch) >= motion.shape[0]
                 t, weights = self.schedule_sampler.sample(
                     micro.shape[0], dist_util.dev())
 
@@ -209,7 +209,7 @@ class TrainLoop:
                     micro,  # [bs, ch, image_size, image_size]
                     t,  # [bs](int) sampled timesteps
                     model_kwargs=micro_cond,
-                    dataset=self.data.dataset
+                    dataset=self.val_data.dataset
                 )
 
                 if last_batch or not self.use_ddp:
@@ -219,6 +219,9 @@ class TrainLoop:
                         losses = compute_losses()
 
                 loss = (losses["loss"] * weights).mean()
+                losses_weighted = {k: v * weights for k, v in losses.items()}
+                for k, v in losses_weighted.items():
+                    wandb.log({f"val_{k}": v})
                 
 
 
@@ -305,9 +308,10 @@ class TrainLoop:
                 )
 
             loss = (losses["loss"] * weights).mean()
-            losses_weighted = {k: v * weights for k, v in losses.items()}
-            for k, v in losses_weighted.items():
-                wandb.log({"val_k": v})
+            log_loss_dict(
+                self.diffusion, t, {k: v * weights for k, v in losses.items()}
+            )
+            self.mp_trainer.backward(loss)
             
 
     def _anneal_lr(self):

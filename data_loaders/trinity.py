@@ -21,23 +21,23 @@ class TrinityDataset(Dataset):
 
         self.split = split
         self.num_frames = num_frames
-        self.motion_dir = path.join(dir, split, 'npz')
-        self.audio_dir = path.join(dir, split, 'audio')
-        self.transcripts_dir = path.join(dir, split, 'json')
+        self.motion_dir = path.join(data_dir, split, 'npz')
+        self.audio_dir = path.join(data_dir, split, 'audio')
+        self.transcripts_dir = path.join(data_dir, split, 'json')
 
         self.clip_length = clip_length
         self.frame_rate = frame_rate
         self.max_text_length = max_text_length
         self.num_frames_per_clip = clip_length * frame_rate
 
-        self.num_offsets = 10
+        self.num_offsets = 10 if split == 'train' else 1
         self.transcripts = []
         for i in range(self.num_offsets):
-            with open(path.join(transcripts_dir, f"text_5s_offset_{i}_s.json")) as f:
+            with open(path.join(self.transcripts_dir, f"text_5s_offset_{i}_half_s.json")) as f:
                 self.transcripts.append(json.load(f))
 
-        motion_files = [path.join(motion_dir, f) for f in listdir(
-            motion_dir) if path.isfile(path.join(motion_dir, f))]
+        motion_files = [path.join(self.motion_dir, f) for f in listdir(
+            self.motion_dir) if path.isfile(path.join(self.motion_dir, f))]
         motion_files.sort()
         self.num_motion_files = len(motion_files)
         self.motion_start_indices = []
@@ -56,8 +56,8 @@ class TrinityDataset(Dataset):
             self.motion_start_indices.append(current_motion_start_index)
             current_motion_start_index += num_frames // self.num_frames_per_clip
 
-        audio_files = [path.join(audio_dir, f) for f in listdir(
-            audio_dir) if path.isfile(path.join(audio_dir, f))]
+        audio_files = [path.join(self.audio_dir, f) for f in listdir(
+            self.audio_dir) if path.isfile(path.join(self.audio_dir, f))]
         audio_files.sort()
         self.audios = []
         for i in range(self.num_motion_files):
@@ -72,7 +72,6 @@ class TrinityDataset(Dataset):
         self.std = np.std(motion_stacked, axis=0)[None, :]
         self.zero_std = np.squeeze(self.std) < 1e-10
         self.num_clips = current_motion_start_index
-
 
         audio_stacked = np.concatenate(self.audios, axis=0)
         self.audio_mean = np.mean(audio_stacked, axis=0)[None, :]
@@ -89,13 +88,11 @@ class TrinityDataset(Dataset):
     def __getitem__(self, index):
         motion_offset = 0
         # We serve one of the clips with offset
-        index = index % self.num_clips
-        offset = index / self.num_clips
+        offset = index // self.num_clips
+        index_within_motion = index % self.num_clips
         motion_offset = self.num_frames_per_clip * (offset // self.num_offsets)              
 
-        motion_index = bisect.bisect_right(
-            self.motion_start_indices, index) - 1
-        index_within_motion = index
+        motion_index = bisect.bisect_right(self.motion_start_indices, index_within_motion) - 1
         if motion_index > 0:
             index_within_motion -= self.motion_start_indices[motion_index]
 
@@ -118,12 +115,12 @@ class TrinityDataset(Dataset):
         audio_norm = audio / self.audio_std
         audio_norm[:, self.audio_zero_std] = audio[:, self.audio_zero_std]
 
-        transcript = self.transcripts[offset]
+        transcript = self.transcripts[offset][motion_index]
         text = transcript[index_within_motion]["section_text"] if index_within_motion < len(
             transcript) else ""
         text_indices = transcript[index_within_motion]["indices"] if index_within_motion < len(
             transcript) else []
-
+        
         return {
             "text": text,
             "text_indices": text_indices,

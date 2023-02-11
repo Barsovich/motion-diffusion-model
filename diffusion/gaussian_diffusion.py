@@ -1326,9 +1326,9 @@ class GaussianDiffusion:
                 terms["rcxyz_mse"] = self.masked_l2(target_xyz, model_output_xyz, mask)  # mean_flat((target_xyz - model_output_xyz) ** 2)
 
             model_output_diff = model_output[:, :, :, 1:] - model_output[:, :, :, :-1]
-            terms["diff_between_frames"] = self.masked_average_sum(torch.abs(model_output_diff), mask[:, :, :, 1:]) 
+            terms["diff_between_frames"] = self.masked_average_sum(model_output_diff ** 2, mask[:, :, :, 1:]) 
             diff_of_diff = model_output_diff[:, :, :, 1:] - model_output_diff[:, :, :, :-1]
-            terms["diff_of_diff_between_frames"] = self.masked_average_sum(torch.abs(diff_of_diff), mask[:, :, :, 2:]) 
+            terms["diff_of_diff_between_frames"] = self.masked_average_sum(diff_of_diff ** 2, mask[:, :, :, 2:]) 
             target_diff = target[:, :, :, 1:] - target[:, :, :, :-1]
             terms["velocity_diff_between_target_and_model"] = self.masked_l2(model_output_diff, target_diff, mask[:, :, :, 1:])
 

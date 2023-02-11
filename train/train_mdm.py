@@ -35,7 +35,7 @@ def main():
     dist_util.setup_dist(args.device)
 
     print("creating data loader...")
-    data = get_dataset_loader(name=args.dataset, batch_size=args.batch_size, split='train'
+    data = get_dataset_loader(name=args.dataset, batch_size=args.batch_size, split='train',
                               num_frames=args.num_frames, num_data_loader_threads=args.num_data_loader_threads)
     
     val_data = get_dataset_loader(name=args.dataset, batch_size=args.batch_size, split='val',

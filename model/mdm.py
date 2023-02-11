@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import clip
 from model.rotation2xyz import Rotation2xyz
-from transformers import AutoTokenizer, GPT2Model
+from transformers import AutoTokenizer, AutoModel
 
 
 class MDM(nn.Module):
@@ -82,7 +82,7 @@ class MDM(nn.Module):
 
         if self.cond_mode != 'no_cond':
             if 'text' in self.cond_mode:
-                self.gpt = GPT2Model.from_pretrained("gpt2")
+                self.gpt = AutoModel.from_pretrained("bert-base-cased")
                 self.gpt.eval()
                 for param in self.gpt.parameters():
                     param.requires_grad = False
@@ -90,7 +90,7 @@ class MDM(nn.Module):
                 self.text_section_embedding_dim = 32
                 self.intermediate_word_embed_dim = self.text_section_embedding_dim
                 self.section_count = 10
-                self.max_tokens_per_section = 7
+                self.max_tokens_per_section = 8
                 self.frames_per_section = 15
                 self.audio_in_dim = 30
                 self.audio_section_embedding_dim = 64
@@ -140,7 +140,7 @@ class MDM(nn.Module):
 
     def encode_text(self, tokens, indices):
         bs = len(indices)
-        out = self.gpt(**tokens).last_hidden_state # [bs, seq_len, gpt_embed_dim]
+        out = self.gpt(**tokens).last_hidden_state[:, 1:-1] # [bs, seq_len, gpt_embed_dim]
         out = self.mlp_for_word_embedding(out) # [bs, seq_len, intermediate_word_embed_dim]
         out_sectionized = torch.zeros((bs, self.section_count * self.max_tokens_per_section, self.intermediate_word_embed_dim), device=out.device)
         for i in range(out.shape[0]):
