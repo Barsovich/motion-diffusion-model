@@ -90,7 +90,7 @@ class MDM(nn.Module):
                 self.text_section_embedding_dim = 32
                 self.intermediate_word_embed_dim = self.text_section_embedding_dim
                 self.section_count = 10
-                self.max_tokens_per_section = 8
+                self.max_tokens_per_section = 15
                 self.frames_per_section = 15
                 self.audio_in_dim = 30
                 self.audio_section_embedding_dim = 64
@@ -144,7 +144,7 @@ class MDM(nn.Module):
         out = self.mlp_for_word_embedding(out) # [bs, seq_len, intermediate_word_embed_dim]
         out_sectionized = torch.zeros((bs, self.section_count * self.max_tokens_per_section, self.intermediate_word_embed_dim), device=out.device)
         for i in range(out.shape[0]):
-            out_sectionized[i, indices[i]] = out[i, :len(indices[i])]
+            out_sectionized[i, indices[i]] += out[i, :len(indices[i])]
         out_sectionized = out_sectionized.permute((0, 2, 1))
         out_sectionized = self.max_pool(out_sectionized)
         out_sectionized = out_sectionized.permute((0, 2, 1))        

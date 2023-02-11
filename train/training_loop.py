@@ -184,6 +184,7 @@ class TrainLoop:
             self.evaluate()
 
     def validation(self):
+        average_losses = {}
         for motion, cond in tqdm(self.val_data):
             motion = motion.to(self.device)
             cond['y'] = {key: val.to(self.device) if torch.is_tensor(
@@ -219,10 +220,14 @@ class TrainLoop:
                         losses = compute_losses()
 
                 loss = (losses["loss"] * weights).mean()
-                losses_weighted = {k: v * weights for k, v in losses.items()}
+                losses_weighted = {k: (v * weights).mean() for k, v in losses.items()}
                 for k, v in losses_weighted.items():
-                    wandb.log({f"val_{k}": v})
-                
+                    if f"val_{k}" in average_losses.keys():
+                        average_losses[f"val_{k}"].append(v.item())
+                    else:
+                        average_losses[f"val_{k}"] = [v.item()] 
+        for k, v in average_losses.items():
+            wandb.log({k: np.mean(v)})               
 
 
     def evaluate(self):

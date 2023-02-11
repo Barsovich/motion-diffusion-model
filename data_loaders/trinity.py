@@ -30,7 +30,7 @@ class TrinityDataset(Dataset):
         self.max_text_length = max_text_length
         self.num_frames_per_clip = clip_length * frame_rate
 
-        self.num_offsets = 10 if split == 'train' else 1
+        self.num_offsets = 10
         self.transcripts = []
         for i in range(self.num_offsets):
             with open(path.join(self.transcripts_dir, f"text_5s_offset_{i}_half_s.json")) as f:
