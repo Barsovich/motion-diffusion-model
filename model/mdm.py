@@ -28,7 +28,18 @@ class MDM(nn.Module):
         self.glob_rot = glob_rot
         self.translation = translation
 
-        self.latent_dim = latent_dim
+        self.gpt_embed_dim = 768
+        self.text_section_embedding_dim = 32
+        self.intermediate_word_embed_dim = self.text_section_embedding_dim
+        self.section_count = 10
+        self.max_tokens_per_section = 15
+        self.frames_per_section = 15
+        self.audio_in_dim = 30
+        self.audio_section_embedding_dim = 64
+        self.sentence_embedding_dim = 512
+        self.clip_dim = clip_dim
+
+        self.latent_dim = self.sentence_embedding_dim + (self.text_section_embedding_dim + self.audio_section_embedding_dim) * self.section_count
 
         self.ff_size = ff_size
         self.num_layers = num_layers
@@ -37,7 +48,6 @@ class MDM(nn.Module):
 
         self.ablation = ablation
         self.activation = activation
-        self.clip_dim = clip_dim
         self.action_emb = kargs.get('action_emb', None)
 
         self.input_feats = self.njoints * self.nfeats
@@ -82,18 +92,16 @@ class MDM(nn.Module):
 
         if self.cond_mode != 'no_cond':
             if 'text' in self.cond_mode:
+
+                self.embed_text = nn.Linear(self.clip_dim, self.sentence_embedding_dim)
+                self.clip_version = clip_version
+                self.clip_model = self.load_and_freeze_clip(clip_version)
+
+
                 self.gpt = AutoModel.from_pretrained("bert-base-cased")
                 self.gpt.eval()
                 for param in self.gpt.parameters():
                     param.requires_grad = False
-                self.gpt_embed_dim = 768
-                self.text_section_embedding_dim = 32
-                self.intermediate_word_embed_dim = self.text_section_embedding_dim
-                self.section_count = 10
-                self.max_tokens_per_section = 15
-                self.frames_per_section = 15
-                self.audio_in_dim = 30
-                self.audio_section_embedding_dim = 64
 
                 self.mlp_for_word_embedding = MLP(self.gpt_embed_dim, self.intermediate_word_embed_dim) 
                 self.max_pool = nn.MaxPool1d(self.max_tokens_per_section, stride=self.max_tokens_per_section)
@@ -102,6 +110,7 @@ class MDM(nn.Module):
                 self.mlp_for_audio_embedding = MLP(self.audio_in_dim * self.frames_per_section, self.audio_section_embedding_dim)
                 self.final_layer_norm_for_cond = nn.LayerNorm(self.audio_section_embedding_dim + self.text_section_embedding_dim)
 
+                self.condition_positional_embed = PositionalEncoding(self.audio_section_embedding_dim + self.text_section_embedding_dim, self.dropout,  self.section_count)
 
             if 'action' in self.cond_mode:
                 self.embed_action = EmbedAction(self.num_actions, self.latent_dim)
@@ -138,6 +147,23 @@ class MDM(nn.Module):
         else:
             return cond
 
+    def encode_sentence(self, raw_text):
+        # raw_text - list (batch_size length) of strings with input text prompts
+        device = next(self.parameters()).device
+        max_text_len = 20 if self.dataset in ['humanml', 'kit'] else None  # Specific hardcoding for humanml dataset
+        if max_text_len is not None:
+            default_context_length = 77
+            context_length = max_text_len + 2 # start_token + 20 + end_token
+            assert context_length < default_context_length
+            texts = clip.tokenize(raw_text, context_length=context_length, truncate=True).to(device) # [bs, context_length] # if n_tokens > context_length -> will truncate
+            # print('texts', texts.shape)
+            zero_pad = torch.zeros([texts.shape[0], default_context_length-context_length], dtype=texts.dtype, device=texts.device)
+            texts = torch.cat([texts, zero_pad], dim=1)
+            # print('texts after pad', texts.shape, texts)
+        else:
+            texts = clip.tokenize(raw_text, truncate=True).to(device) # [bs, context_length] # if n_tokens > 77 -> will truncate
+        return self.clip_model.encode_text(texts).float()
+
     def encode_text(self, tokens, indices):
         bs = len(indices)
         out = self.gpt(**tokens).last_hidden_state[:, 1:-1] # [bs, seq_len, gpt_embed_dim]
@@ -169,9 +195,15 @@ class MDM(nn.Module):
         if 'text' in self.cond_mode:
             enc_text = self.encode_text(y['tokens'], y['text_indices'])
             enc_audio = self.encode_audio(y['audio'])
-            enc_cond = torch.cat((enc_text, enc_audio), axis=2)
-            enc_cond = self.final_layer_norm_for_cond(enc_cond)
-            enc_cond = enc_cond.reshape((bs, -1))
+            enc_sentence = self.embed_text(self.encode_sentence(y['text']))
+
+            enc_sections = torch.cat((enc_text, enc_audio), axis=2)
+            enc_sections = self.final_layer_norm_for_cond(enc_sections)
+            enc_sections = self.condition_positional_embed(enc_sections)
+            enc_sections = enc_sections.reshape((bs, -1))
+
+            enc_cond = torch.cat((enc_sections, enc_sentence), axis=1)
+
             emb += self.mask_cond(enc_cond, force_mask=force_mask)
         if 'action' in self.cond_mode:
             action_emb = self.embed_action(y['action'])
