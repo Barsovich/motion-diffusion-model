@@ -38,8 +38,9 @@ class MDM(nn.Module):
         self.audio_section_embedding_dim = 64
         self.sentence_embedding_dim = 512
         self.clip_dim = clip_dim
+        self.section_embedding_dim = (self.text_section_embedding_dim + self.audio_section_embedding_dim) * self.section_count
 
-        self.latent_dim = self.sentence_embedding_dim + (self.text_section_embedding_dim + self.audio_section_embedding_dim) * self.section_count
+        self.latent_dim = self.sentence_embedding_dim + self.section_embedding_dim 
 
         self.ff_size = ff_size
         self.num_layers = num_layers
@@ -110,7 +111,7 @@ class MDM(nn.Module):
                 self.mlp_for_audio_embedding = MLP(self.audio_in_dim * self.frames_per_section, self.audio_section_embedding_dim)
                 self.final_layer_norm_for_cond = nn.LayerNorm(self.audio_section_embedding_dim + self.text_section_embedding_dim)
 
-                self.condition_positional_embed = PositionalEncoding(self.audio_section_embedding_dim + self.text_section_embedding_dim, self.dropout,  self.section_count)
+                self.condition_positional_embed = PositionalEncoding(self.text_section_embedding_dim + self.audio_section_embedding_dim, self.dropout,  self.section_count)
 
             if 'action' in self.cond_mode:
                 self.embed_action = EmbedAction(self.num_actions, self.latent_dim)
@@ -199,7 +200,7 @@ class MDM(nn.Module):
 
             enc_sections = torch.cat((enc_text, enc_audio), axis=2)
             enc_sections = self.final_layer_norm_for_cond(enc_sections)
-            enc_sections = self.condition_positional_embed(enc_sections)
+            enc_sections = self.condition_positional_embed(enc_sections.unsqueeze(2))
             enc_sections = enc_sections.reshape((bs, -1))
 
             enc_cond = torch.cat((enc_sections, enc_sentence), axis=1)
