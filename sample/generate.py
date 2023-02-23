@@ -83,8 +83,8 @@ def main():
     load_model_wo_clip(model, state_dict)
 
 
-    tokenizer = AutoTokenizer.from_pretrained("gpt2")
-    tokenizer.pad_token = tokenizer.eos_token
+    tokenizer = AutoTokenizer.from_pretrained("bert-base-cased")
+    tokenizer.add_special_tokens({'pad_token': '[PAD]'})
 
     if args.guidance_param != 1:
         model = ClassifierFreeSampleModel(model)   # wrapping model with the classifier-free sampler
@@ -93,7 +93,7 @@ def main():
 
     if is_using_data:
         iterator = iter(data)
-        _, model_kwargs = next(iterator)
+        motion, model_kwargs = next(iterator)
         model_kwargs['y'] = {key: val.to(args.device) if torch.is_tensor(
             val) else val for key, val in model_kwargs['y'].items()}
         model_kwargs['y']["tokens"] = tokenizer(model_kwargs['y']["text"], padding=True, return_tensors="pt")
@@ -116,6 +116,7 @@ def main():
     all_motions = []
     all_lengths = []
     all_text = []
+    all_inputs = []
 
     for rep_i in range(args.num_repetitions):
         print(f'### Sampling [repetitions #{rep_i}]')
@@ -155,13 +156,18 @@ def main():
         sample = sample.cpu()
         sample[:, ~data.dataset.zero_std, :, :] *= data.dataset.std[:, ~data.dataset.zero_std, None, None].astype('float32')
         sample += data.dataset.mean[:, :, None, None]
-        
+
+        motion = motion.cpu()
+        motion[:, ~data.dataset.zero_std, :, :] *= data.dataset.std[:, ~data.dataset.zero_std, None, None].astype('float32')
+        motion += data.dataset.mean[:, :, None, None]
+
         if args.unconstrained:
             all_text += ['unconstrained'] * args.num_samples
         else:
             text_key = 'text' if 'text' in model_kwargs['y'] else 'action_text'
             all_text += model_kwargs['y'][text_key]
 
+        all_inputs.append(motion.cpu().numpy())
         all_motions.append(sample.cpu().numpy())
         all_lengths.append(model_kwargs['y']['lengths'].cpu().numpy())
 
@@ -170,6 +176,10 @@ def main():
 
     all_motions = np.concatenate(all_motions, axis=0)
     all_motions = all_motions[:total_num_samples]  # [bs, njoints, 6, seqlen]
+
+    all_inputs = np.concatenate(all_inputs, axis=0)
+    all_inputs = all_inputs[:total_num_samples]  # [bs, njoints, 6, seqlen]
+
     all_text = all_text[:total_num_samples]
     all_lengths = np.concatenate(all_lengths, axis=0)[:total_num_samples]
 
@@ -180,7 +190,7 @@ def main():
     npy_path = os.path.join(out_path, 'results.npy')
     print(f"saving results file to [{npy_path}]")
     np.save(npy_path,
-            {'motion': all_motions, 'text': all_text, 'lengths': all_lengths,
+            {'motion': all_motions, 'text': all_text, 'lengths': all_lengths, 'input': all_inputs,
              'num_samples': args.num_samples, 'num_repetitions': args.num_repetitions})
     with open(npy_path.replace('.npy', '.txt'), 'w') as fw:
         fw.write('\n'.join(all_text))

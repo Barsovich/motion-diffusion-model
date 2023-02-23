@@ -345,6 +345,12 @@ class TrainLoop:
             for e in clip_weights:
                 del state_dict[e]
 
+            # Do not save BERT weights
+            bert_weights = [
+                e for e in state_dict.keys() if e.startswith('bert.')]
+            for e in bert_weights:
+                del state_dict[e]
+
             logger.log(f"saving model...")
             filename = self.ckpt_file_name()
             with bf.BlobFile(bf.join(self.save_dir, filename), "wb") as f:

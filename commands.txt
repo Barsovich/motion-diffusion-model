@@ -2,7 +2,15 @@ scp -i /Users/barissen/.ssh/aws-key.pem -r ~/projects/gesture-diffuser/data/GENE
 scp -i /Users/barissen/.ssh/aws-key.pem -r ~/projects/gesture-diffuser/data/GENEA_2022/trn/json ubuntu@ec2-35-91-123-22.us-west-2.compute.amazonaws.com:/home/ubuntu/motion-diffusion-model/dataset/genea_2022/trn
 python -m train.train_mdm --save_dir save/genea_debug --dataset trinity --batch_size 1 --num_data_loader_threads 0 --num_steps 5000 --overwrite
 
-python -m sample.generate --model_path ./save/genea_2022/model000010000.pt --num_samples 10 --num_repetitions 1
+python -m sample.generate --model_path /home/ubuntu/motion-diffusion-model/save/genea_2022_02_21_after_debug/model000020000.pt --num_samples 10 --num_repetitions 1
 python features2bvh.py --feat_dir ../data/GENEA_2022/sample/samples_genea_2022_000010000_seed10/results.npy --bvh_dir ../data/GENEA_2022/sample/samples_genea_2022_000010000_seed10/inverted.bvh
 python ./example.py "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_genea_2022_000010000_seed10/inverted.bvh" -o "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_genea_2022_000010000_seed10/out.mp4" -m "upper_body"
 
+python -m train.train_mdm --save_dir save/genea_2022_smooth_losses_01_01 --dataset trinity --batch_size 64 --num_steps 50000 --overwrite --lambda_approx_vel 0.1 --lambda_smooth 0.1
+
+python -m train.train_mdm --save_dir save/debug_resume --dataset trinity --batch_size 64 --num_data_loader_threads 0 --num_steps 100000 --overwrite --lambda_approx_vel 1.0 --resume_checkpoint /home/ubuntu/motion-diffusion-model/save/genea_2022_pos_embed_clip_and_bert_approx_vel_1/model000020000.pt
+
+python -m train.train_mdm --save_dir save/genea_2022_02_21_after_debug --dataset trinity --batch_size 64 --num_steps 50000 --overwrite --lambda_approx_vel 0.1
+python -m train.train_mdm --save_dir save/debug --dataset trinity --batch_size 1 --num_data_loader_threads 0 --num_steps 50000 --overwrite
+
+python -m sample.generate --model_path /home/ubuntu/motion-diffusion-model/save/debug/model000020000.pt --num_samples 5 --num_repetitions 1
