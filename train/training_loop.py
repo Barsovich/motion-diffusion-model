@@ -19,7 +19,7 @@ from data_loaders.humanml.networks.evaluator_wrapper import EvaluatorMDMWrapper
 from eval import eval_humanml, eval_humanact12_uestc
 from data_loaders.get_data import get_dataset_loader
 import wandb
-from transformers import AutoTokenizer
+# from transformers import AutoTokenizer
 
 
 # For ImageNet experiments, this was a good default value.
@@ -64,8 +64,8 @@ class TrainLoop:
             fp16_scale_growth=self.fp16_scale_growth,
         )
 
-        self.tokenizer = AutoTokenizer.from_pretrained("bert-base-cased")
-        self.tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+        # self.tokenizer = AutoTokenizer.from_pretrained("bert-base-cased")
+        # self.tokenizer.add_special_tokens({'pad_token': '[PAD]'})
 
         self.save_dir = args.save_dir
         self.overwrite = args.overwrite
@@ -148,9 +148,9 @@ class TrainLoop:
                 cond['y'] = {key: val.to(self.device) if torch.is_tensor(
                     val) else val for key, val in cond['y'].items()}
 
-                cond['y']["tokens"] = self.tokenizer(cond['y']["text"], padding=True, return_tensors="pt")
-                cond['y']['tokens'] = {key: val.to(self.device) if torch.is_tensor(
-                    val) else val for key, val in cond['y']['tokens'].items()}
+                # cond['y']["tokens"] = self.tokenizer(cond['y']["text"], padding=True, return_tensors="pt")
+                # cond['y']['tokens'] = {key: val.to(self.device) if torch.is_tensor(
+                #     val) else val for key, val in cond['y']['tokens'].items()}
 
                 self.run_step(motion, cond)
                 if self.step % self.log_interval == 0:
@@ -190,9 +190,9 @@ class TrainLoop:
             cond['y'] = {key: val.to(self.device) if torch.is_tensor(
                 val) else val for key, val in cond['y'].items()}
 
-            cond['y']["tokens"] = self.tokenizer(cond['y']["text"], padding=True, return_tensors="pt")
-            cond['y']['tokens'] = {key: val.to(self.device) if torch.is_tensor(
-                val) else val for key, val in cond['y']['tokens'].items()}
+            # cond['y']["tokens"] = self.tokenizer(cond['y']["text"], padding=True, return_tensors="pt")
+            # cond['y']['tokens'] = {key: val.to(self.device) if torch.is_tensor(
+            #     val) else val for key, val in cond['y']['tokens'].items()}
 
             for i in range(0, motion.shape[0], self.microbatch):
                 # Eliminates the microbatch feature

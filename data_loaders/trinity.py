@@ -19,7 +19,7 @@ class TrinityDataset(Dataset):
 
         super().__init__()
 
-        self.split = split if split != 'test' else 'train'
+        self.split = split if split != 'test' else 'val'
         self.num_frames = num_frames
         self.motion_dir = path.join(data_dir, self.split, 'npz')
         self.audio_dir = path.join(data_dir, self.split, 'audio')
@@ -85,7 +85,7 @@ class TrinityDataset(Dataset):
         # The first self.num_clips many items are the clips at offset 0
         # The next self.num_clips many items are the clips at offset (self.num_frames_per_clip // 2)
         # Instead of the clip of each motion which is actually half size, we give the last full motion
-        return 1 # self.num_clips * self.num_offsets
+        return self.num_clips * self.num_offsets
 
     def __getitem__(self, index):
         motion_offset = 0

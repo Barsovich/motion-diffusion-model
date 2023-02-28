@@ -28,13 +28,13 @@ class MDM(nn.Module):
         self.translation = translation
 
         self.bert_embed_dim = 768
-        self.text_section_embedding_dim = 32
+        self.text_section_embedding_dim = 0
         self.intermediate_word_embed_dim = self.text_section_embedding_dim
         self.section_count = 10
         self.max_tokens_per_section = 15
         self.frames_per_section = 15
         self.audio_in_dim = 30
-        self.audio_section_embedding_dim = 64
+        self.audio_section_embedding_dim = 96
         self.sentence_embedding_dim = 512
         self.clip_dim = clip_dim
         self.section_embedding_dim = (self.text_section_embedding_dim + self.audio_section_embedding_dim) * self.section_count
@@ -93,19 +93,19 @@ class MDM(nn.Module):
         if self.cond_mode != 'no_cond':
             if 'text' in self.cond_mode:
 
-                self.embed_text = nn.Linear(self.bert_embed_dim, self.sentence_embedding_dim)
-                # self.clip_version = clip_version
-                # self.clip_model = self.load_and_freeze_clip(clip_version)
+                self.embed_text = nn.Linear(self.sentence_embedding_dim, self.sentence_embedding_dim)
+                self.clip_version = clip_version
+                self.clip_model = self.load_and_freeze_clip(clip_version)
 
 
-                self.bert = AutoModel.from_pretrained("bert-base-cased")
-                self.bert.eval()
-                for param in self.bert.parameters():
-                    param.requires_grad = False
+                # self.bert = AutoModel.from_pretrained("bert-base-cased")
+                # self.bert.eval()
+                # for param in self.bert.parameters():
+                #     param.requires_grad = False
 
-                self.mlp_for_word_embedding = MLP(self.bert_embed_dim, self.intermediate_word_embed_dim) 
-                self.max_pool = nn.MaxPool1d(self.max_tokens_per_section, stride=self.max_tokens_per_section)
-                self.mlp_for_section_embedding = MLP(self.intermediate_word_embed_dim * self.max_tokens_per_section, self.text_section_embedding_dim) 
+                # self.mlp_for_word_embedding = MLP(self.bert_embed_dim, self.intermediate_word_embed_dim) 
+                # self.max_pool = nn.MaxPool1d(self.max_tokens_per_section, stride=self.max_tokens_per_section)
+                # self.mlp_for_section_embedding = MLP(self.intermediate_word_embed_dim * self.max_tokens_per_section, self.text_section_embedding_dim) 
 
                 self.mlp_for_audio_embedding = MLP(self.audio_in_dim * self.frames_per_section, self.audio_section_embedding_dim)
                 # self.final_layer_norm_for_cond = nn.LayerNorm(self.audio_section_embedding_dim + self.text_section_embedding_dim)
@@ -147,36 +147,36 @@ class MDM(nn.Module):
         else:
             return cond
 
-    # def encode_sentence(self, raw_text):
-    #     # raw_text - list (batch_size length) of strings with input text prompts
-    #     device = next(self.parameters()).device
-    #     max_text_len = 20 if self.dataset in ['humanml', 'kit'] else None  # Specific hardcoding for humanml dataset
-    #     if max_text_len is not None:
-    #         default_context_length = 77
-    #         context_length = max_text_len + 2 # start_token + 20 + end_token
-    #         assert context_length < default_context_length
-    #         texts = clip.tokenize(raw_text, context_length=context_length, truncate=True).to(device) # [bs, context_length] # if n_tokens > context_length -> will truncate
-    #         # print('texts', texts.shape)
-    #         zero_pad = torch.zeros([texts.shape[0], default_context_length-context_length], dtype=texts.dtype, device=texts.device)
-    #         texts = torch.cat([texts, zero_pad], dim=1)
-    #         # print('texts after pad', texts.shape, texts)
-    #     else:
-    #         texts = clip.tokenize(raw_text, truncate=True).to(device) # [bs, context_length] # if n_tokens > 77 -> will truncate
-    #     return self.clip_model.encode_text(texts).float()
+    def encode_sentence(self, raw_text):
+        # raw_text - list (batch_size length) of strings with input text prompts
+        device = next(self.parameters()).device
+        max_text_len = 20 if self.dataset in ['humanml', 'kit'] else None  # Specific hardcoding for humanml dataset
+        if max_text_len is not None:
+            default_context_length = 77
+            context_length = max_text_len + 2 # start_token + 20 + end_token
+            assert context_length < default_context_length
+            texts = clip.tokenize(raw_text, context_length=context_length, truncate=True).to(device) # [bs, context_length] # if n_tokens > context_length -> will truncate
+            # print('texts', texts.shape)
+            zero_pad = torch.zeros([texts.shape[0], default_context_length-context_length], dtype=texts.dtype, device=texts.device)
+            texts = torch.cat([texts, zero_pad], dim=1)
+            # print('texts after pad', texts.shape, texts)
+        else:
+            texts = clip.tokenize(raw_text, truncate=True).to(device) # [bs, context_length] # if n_tokens > 77 -> will truncate
+        return self.clip_model.encode_text(texts).float()
 
-    def encode_text(self, tokens, indices):
-        bs = len(indices)
-        out = self.bert(**tokens).last_hidden_state # [bs, seq_len, bert_embed_dim]
-        sentence_embedding = self.embed_text(out[:, 0]) # CLS token
-        out = out[:, 1:-1]
-        out = self.mlp_for_word_embedding(out) # [bs, seq_len, intermediate_word_embed_dim]
-        out_sectionized = torch.zeros((bs, self.section_count * self.max_tokens_per_section, self.intermediate_word_embed_dim), device=out.device)
-        for i in range(out.shape[0]):
-            out_sectionized[i, indices[i]] += out[i, :len(indices[i])]
-        out_sectionized = out_sectionized.permute((0, 2, 1))
-        out_sectionized = self.max_pool(out_sectionized)
-        out_sectionized = out_sectionized.permute((0, 2, 1))        
-        return out_sectionized, sentence_embedding
+    # def encode_text(self, tokens, indices):
+    #     bs = len(indices)
+    #     out = self.bert(**tokens).last_hidden_state # [bs, seq_len, bert_embed_dim]
+    #     sentence_embedding = self.embed_text(out[:, 0]) # CLS token
+    #     out = out[:, 1:-1]
+    #     out = self.mlp_for_word_embedding(out) # [bs, seq_len, intermediate_word_embed_dim]
+    #     out_sectionized = torch.zeros((bs, self.section_count * self.max_tokens_per_section, self.intermediate_word_embed_dim), device=out.device)
+    #     for i in range(out.shape[0]):
+    #         out_sectionized[i, indices[i]] += out[i, :len(indices[i])]
+    #     # out_sectionized = out_sectionized.permute((0, 2, 1))
+    #     # out_sectionized = self.max_pool(out_sectionized)
+    #     # out_sectionized = out_sectionized.permute((0, 2, 1))        
+    #     return out_sectionized, sentence_embedding
 
     def encode_audio(self, audio):
         bs = audio.shape[0]
@@ -195,16 +195,16 @@ class MDM(nn.Module):
 
         force_mask = y.get('uncond', False)
         if 'text' in self.cond_mode:
-            enc_text, enc_sentence = self.encode_text(y['tokens'], y['text_indices'])
+            # enc_text, enc_sentence = self.encode_text(y['tokens'], y['text_indices'])
             enc_audio = self.encode_audio(y['audio'])
-            # enc_sentence = self.embed_text(self.encode_sentence(y['text']))
+            enc_sentence = self.embed_text(self.encode_sentence(y['text']))
 
-            enc_sections = torch.cat((enc_text, enc_audio), axis=2)
+            # enc_sections = torch.cat((enc_text, enc_audio), axis=2)
             # enc_sections = self.final_layer_norm_for_cond(enc_sections)
             # enc_sections = self.condition_positional_embed(enc_sections.unsqueeze(2))
-            enc_sections = enc_sections.reshape((bs, -1))
-
-            enc_cond = torch.cat((enc_sections, enc_sentence), axis=1)
+            # enc_sections = enc_sections.reshape((bs, -1))
+            enc_audio = enc_audio.reshape((bs, -1))
+            enc_cond = torch.cat((enc_audio, enc_sentence), axis=1)
 
             emb += self.mask_cond(enc_cond, force_mask=force_mask)
         if 'action' in self.cond_mode:
@@ -263,12 +263,12 @@ class MLP(nn.Module):
         out_features = out_features or in_features
         self.fc1 = nn.Linear(in_features, out_features, bias)
         self.act = act_layer()
-        # self.norm = norm_layer(out_features)
+        self.norm = norm_layer(out_features)
         self.dropout = nn.Dropout(drop)
 
     def forward(self, x):
         x = self.fc1(x)
-        # x = self.norm(x)
+        x = self.norm(x)
         x = self.act(x)
         x = self.dropout(x)
         return x
