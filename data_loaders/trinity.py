@@ -19,11 +19,11 @@ class TrinityDataset(Dataset):
 
         super().__init__()
 
-        self.split = split
+        self.split = split if split != 'test' else 'val'
         self.num_frames = num_frames
-        self.motion_dir = path.join(data_dir, split, 'npz')
-        self.audio_dir = path.join(data_dir, split, 'audio')
-        self.transcripts_dir = path.join(data_dir, split, 'json')
+        self.motion_dir = path.join(data_dir, self.split, 'npz')
+        self.audio_dir = path.join(data_dir, self.split, 'audio')
+        self.transcripts_dir = path.join(data_dir, self.split, 'json')
 
         self.clip_length = clip_length
         self.frame_rate = frame_rate
@@ -72,11 +72,13 @@ class TrinityDataset(Dataset):
         self.std = np.std(motion_stacked, axis=0)[None, :]
         self.zero_std = np.squeeze(self.std) < 1e-10
         self.num_clips = current_motion_start_index
+        self.std[self.std == 0] = 1e-5
 
         audio_stacked = np.concatenate(self.audios, axis=0)
         self.audio_mean = np.mean(audio_stacked, axis=0)[None, :]
         self.audio_std = np.std(audio_stacked, axis=0)[None, :]
         self.audio_zero_std = np.squeeze(self.audio_std) < 1e-10
+        self.audio_std[self.audio_std == 0] = 1e-5
 
 
     def __len__(self):

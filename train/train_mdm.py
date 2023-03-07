@@ -14,6 +14,8 @@ from utils.model_util import create_model_and_diffusion
 from train.train_platforms import ClearmlPlatform, TensorboardPlatform, NoPlatform  # required for the eval operation
 import wandb
 import time
+import torch.multiprocessing
+torch.multiprocessing.set_sharing_strategy('file_system')
 
 def main():
     args = train_args()
