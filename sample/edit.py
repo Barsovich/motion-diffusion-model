@@ -64,10 +64,10 @@ def main():
     iterator = iter(data)
     input_motions, model_kwargs = next(iterator)
     input_motions = input_motions.to(dist_util.dev())
-    texts = [args.text_condition] * args.num_samples
-    model_kwargs['y']['text'] = texts
-    if args.text_condition == '':
-        args.guidance_param = 0.  # Force unconditioned generation
+    # texts = [args.text_condition] * args.num_samples
+    # model_kwargs['y']['text'] = texts
+    # if args.text_condition == '':
+    #     args.guidance_param = 0.  # Force unconditioned generation
 
     # add inpainting mask according to args
     assert max_frames == input_motions.shape[-1]
