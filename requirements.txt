@@ -26,5 +26,8 @@ scipy
 ipykernel
 wandb
 blobfile
-pydub
-SpeechRecognition
+librosa
+praat-parselmouth
+python_speech_features
+tensorboard
+transformers

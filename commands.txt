@@ -14,3 +14,51 @@ python -m train.train_mdm --save_dir save/genea_2022_02_21_after_debug --dataset
 python -m train.train_mdm --save_dir save/debug --dataset trinity --batch_size 1 --num_data_loader_threads 0 --num_steps 50000 --overwrite
 
 python -m sample.generate --model_path /home/ubuntu/motion-diffusion-model/save/debug/model000020000.pt --num_samples 5 --num_repetitions 1
+
+
+scp -i /Users/barissen/.ssh/aws-key.pem -r ~/projects/gesture-diffuser/data/GENEA_2022/val/npz/ ubuntu@ec2-54-186-224-32.us-west-2.compute.amazonaws.com:/home/ubuntu/motion-diffusion-model/dataset/genea_2022/val &&
+scp -i /Users/barissen/.ssh/aws-key.pem -r ~/projects/gesture-diffuser/data/GENEA_2022/val/audio_features/ ubuntu@ec2-54-186-224-32.us-west-2.compute.amazonaws.com:/home/ubuntu/motion-diffusion-model/dataset/genea_2022/val &&
+scp -i /Users/barissen/.ssh/aws-key.pem -r ~/projects/gesture-diffuser/data/GENEA_2022/val/json/ ubuntu@ec2-54-186-224-32.us-west-2.compute.amazonaws.com:/home/ubuntu/motion-diffusion-model/dataset/genea_2022/val
+
+scp -i /Users/barissen/.ssh/aws-key.pem -r ~/projects/gesture-diffuser/data/GENEA_2022/train/npz/ ubuntu@ec2-54-186-224-32.us-west-2.compute.amazonaws.com:/home/ubuntu/motion-diffusion-model/dataset/genea_2022/train &&
+scp -i /Users/barissen/.ssh/aws-key.pem -r ~/projects/gesture-diffuser/data/GENEA_2022/train/audio_features/ ubuntu@ec2-54-186-224-32.us-west-2.compute.amazonaws.com:/home/ubuntu/motion-diffusion-model/dataset/genea_2022/train &&
+scp -i /Users/barissen/.ssh/aws-key.pem -r ~/projects/gesture-diffuser/data/GENEA_2022/train/json/ ubuntu@ec2-54-186-224-32.us-west-2.compute.amazonaws.com:/home/ubuntu/motion-diffusion-model/dataset/genea_2022/train
+
+
+
+python -m train.train_mdm --save_dir save/genea_debug --dataset trinity --batch_size 1 --num_data_loader_threads 0 --num_steps 5000 --overwrite
+
+python -m sample.generate --num_samples 10 --num_repetitions 1 --model_path ./save/genea_2022/model000010000.pt
+python features2bvh.py --feat_dir /Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/results.npy --bvh_dir /Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/
+
+python ./example.py "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/result_0.bvh" -o "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/out_0.mp4" -m "upper_body" &&
+python ./example.py "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/result_1.bvh" -o "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/out_1.mp4" -m "upper_body" &&
+python ./example.py "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/result_2.bvh" -o "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/out_2.mp4" -m "upper_body" &&
+python ./example.py "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/result_3.bvh" -o "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/out_3.mp4" -m "upper_body" &&
+python ./example.py "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/result_4.bvh" -o "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/out_4.mp4" -m "upper_body" &&
+python ./example.py "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/result_5.bvh" -o "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/out_5.mp4" -m "upper_body" &&
+python ./example.py "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/result_6.bvh" -o "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/out_6.mp4" -m "upper_body" &&
+python ./example.py "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/result_7.bvh" -o "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/out_7.mp4" -m "upper_body" &&
+python ./example.py "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/result_8.bvh" -o "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/out_8.mp4" -m "upper_body" &&
+python ./example.py "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/result_9.bvh" -o "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/out_9.mp4" -m "upper_body" &&
+python ./example.py "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/input_0.bvh" -o "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/input_0.mp4" -m "upper_body" &&
+python ./example.py "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/input_1.bvh" -o "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/input_1.mp4" -m "upper_body" &&
+python ./example.py "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/input_2.bvh" -o "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/input_2.mp4" -m "upper_body" &&
+python ./example.py "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/input_3.bvh" -o "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/input_3.mp4" -m "upper_body" &&
+python ./example.py "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/input_4.bvh" -o "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/input_4.mp4" -m "upper_body" &&
+python ./example.py "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/input_5.bvh" -o "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/input_5.mp4" -m "upper_body" &&
+python ./example.py "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/input_6.bvh" -o "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/input_6.mp4" -m "upper_body" &&
+python ./example.py "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/input_7.bvh" -o "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/input_7.mp4" -m "upper_body" &&
+python ./example.py "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/input_8.bvh" -o "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/input_8.mp4" -m "upper_body" &&
+python ./example.py "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/input_9.bvh" -o "/Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/input_9.mp4" -m "upper_body"
+
+source /Users/barissen/projects/gesture-diffuser/venv/bin/activate
+
+
+python features2bvh.py --feat_dir /Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/results.npy --bvh_dir /Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/ &&
+python features2bvh.py --feat_dir /Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/results.npy --bvh_dir /Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/ &&
+python features2bvh.py --feat_dir /Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/results.npy --bvh_dir /Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/ &&
+python features2bvh.py --feat_dir /Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/results.npy --bvh_dir /Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/ &&
+python features2bvh.py --feat_dir /Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/results.npy --bvh_dir /Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/ &&
+python features2bvh.py --feat_dir /Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/results.npy --bvh_dir /Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/ &&
+python features2bvh.py --feat_dir /Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/results.npy --bvh_dir /Users/barissen/projects/gesture-diffuser/data/GENEA_2022/sample/samples_no_section_0_thread_000040000_seed10/
